@@ -1,0 +1,162 @@
+{
+    "mass": [
+        "질량",
+        "mass",
+        "m_",
+        "m(kg)",
+        "weight",
+        "무게",
+        "m(g)"
+    ],
+    "velocity": [
+        "속도",
+        "velocity",
+        "v_",
+        "v(m/s)",
+        "speed",
+        "vel"
+    ],
+    "radius": [
+        "반지름",
+        "radius",
+        "r_",
+        "r(m)",
+        "dist_center"
+    ],
+    "force": [
+        "힘",
+        "force",
+        "F_",
+        "F(N)",
+        "f(n)"
+    ],
+    "length": [
+        "길이",
+        "length",
+        "L_",
+        "L(m)",
+        "distance",
+        "l(m)"
+    ],
+    "time": [
+        "시간",
+        "time",
+        "t_",
+        "t(s)",
+        "duration"
+    ],
+    "acceleration": [
+        "가속도",
+        "acceleration",
+        "a_",
+        "a(m/s²)",
+        "accel",
+        "a(m/s2)"
+    ],
+    "period": [
+        "주기",
+        "period",
+        "T_",
+        "T(s)",
+        "cycle"
+    ],
+    "frequency": [
+        "진동수",
+        "frequency",
+        "f_",
+        "f(Hz)",
+        "freq"
+    ],
+    "wavelength": [
+        "파장",
+        "wavelength",
+        "lambda",
+        "λ"
+    ],
+    "displacement": [
+        "변위",
+        "displacement",
+        "x_",
+        "x(m)",
+        "delta_x",
+        "Δx"
+    ],
+    "current": [
+        "전류",
+        "current",
+        "I_",
+        "I(A)",
+        "ampere",
+        "i(a)"
+    ],
+    "voltage": [
+        "전압",
+        "voltage",
+        "V_",
+        "V(V)",
+        "potential",
+        "v(v)"
+    ],
+    "resistance": [
+        "저항",
+        "resistance",
+        "R_",
+        "R(Ω)",
+        "ohm",
+        "r(ω)"
+    ],
+    "charge": [
+        "전하",
+        "charge",
+        "q_",
+        "q(C)",
+        "coulomb"
+    ],
+    "magnetic_field": [
+        "자기장",
+        "magnetic",
+        "B_",
+        "B(T)",
+        "field"
+    ],
+    "moment_of_inertia": [
+        "관성모멘트",
+        "inertia",
+        "I_",
+        "moment"
+    ],
+    "distance": [
+        "거리",
+        "distance",
+        "d_",
+        "d(m)",
+        "dist"
+    ],
+    "power": [
+        "전력",
+        "power",
+        "P_",
+        "P(W)",
+        "watt"
+    ],
+    "momentum": [
+        "운동량",
+        "momentum",
+        "p_",
+        "p(kg·m/s)"
+    ],
+    "angle": [
+        "각도",
+        "angle",
+        "theta",
+        "θ",
+        "deg",
+        "degree"
+    ],
+    "temperature": [
+        "온도",
+        "temperature",
+        "T_",
+        "temp"
+    ]
+}

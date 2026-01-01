@@ -1,0 +1,67 @@
+{
+    "linear": {
+        "name": "선형 (Linear)",
+        "equation": "y = ax + b",
+        "description": "등속도 운동, 옴의 법칙",
+        "params": 2,
+        "initial_guess": [
+            1.0,
+            0.0
+        ]
+    },
+    "quadratic": {
+        "name": "2차 다항식 (Quadratic)",
+        "equation": "y = ax² + bx + c",
+        "description": "등가속도 운동, 포물선 운동",
+        "params": 3,
+        "initial_guess": [
+            1.0,
+            0.0,
+            0.0
+        ]
+    },
+    "exponential": {
+        "name": "지수 함수 (Exponential)",
+        "equation": "y = a·e^(bx) + c",
+        "description": "RC 회로, 방사성 붕괴, 냉각 법칙",
+        "params": 3,
+        "initial_guess": [
+            1.0,
+            0.1,
+            0.0
+        ]
+    },
+    "power_law": {
+        "name": "거듭제곱 (Power Law)",
+        "equation": "y = a·x^b + c",
+        "description": "만유인력, 보일의 법칙, 케플러 법칙",
+        "params": 3,
+        "initial_guess": [
+            1.0,
+            1.0,
+            0.0
+        ]
+    },
+    "logarithmic": {
+        "name": "로그 함수 (Logarithmic)",
+        "equation": "y = a·ln(x) + b",
+        "description": "음향 강도, pH, 심리물리학",
+        "params": 2,
+        "initial_guess": [
+            1.0,
+            0.0
+        ]
+    },
+    "sine": {
+        "name": "삼각 함수 (Sine Wave)",
+        "equation": "y = a·sin(bx + c) + d",
+        "description": "단진자, 파동, 교류 전류",
+        "params": 4,
+        "initial_guess": [
+            1.0,
+            1.0,
+            0.0,
+            0.0
+        ]
+    }
+}
