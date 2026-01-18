@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary-gradient: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  --secondary-gradient: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+  --surface-glass: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+}
+
+@layer base {
+  body {
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    @apply bg-[#f8fafc] text-slate-900 overflow-hidden;
+  }
+
+  code,
+  pre,
+  .font-mono {
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-bold tracking-tight;
+  }
+}
+
+@layer components {
+  .glass-card {
+    background: var(--surface-glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+  }
+
+  .primary-gradient {
+    background: var(--primary-gradient);
+  }
+
+  .secondary-gradient {
+    background: var(--secondary-gradient);
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent primary-gradient;
+  }
+
+  .btn-primary {
+    @apply primary-gradient text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 ring-4 ring-blue-50/50;
+  }
+
+  .btn-secondary {
+    @apply secondary-gradient text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 ring-4 ring-emerald-50/50;
+  }
+
+  .premium-input {
+    @apply bg-white/50 border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl px-4 py-3 outline-none transition-all font-medium;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-200 rounded-full hover:bg-slate-300 transition-colors;
+}

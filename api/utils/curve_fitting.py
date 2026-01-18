@@ -108,41 +108,45 @@ def smart_curve_fitting(x_data, y_data, models_to_try=None):
             k = model_info['params']  # 파라미터 개수
             
             # 데이터 범위 계산
-            y_range = y_data.max() - y_data.min()
-            y_mean = y_data.mean()
-            x_range = x_data.max() - x_data.min()
+            y_range = y_data.max() - y_data.min() if len(y_data) > 0 else 1.0
+            y_mean = y_data.mean() if len(y_data) > 0 else 0.0
+            x_range = x_data.max() - x_data.min() if len(x_data) > 0 else 1.0
             
-            # 특별 처리: 선형 모델은 polyfit 사용
+            # 스마트 초기값 설정
             if model_key == 'linear':
-                coeffs = np.polyfit(x_data, y_data, 1)
-                popt = [coeffs[0], coeffs[1]]
-                y_pred = linear_func(x_data, *popt)
+                # polyfit 대신 curve_fit을 사용하여 공분산 행렬(pcov)을 얻음
+                p0 = [1.0, 0.0]
+                # 더 나은 초기값 시도
+                if len(x_data) > 1:
+                    coeffs = np.polyfit(x_data, y_data, 1)
+                    p0 = [coeffs[0], coeffs[1]]
+            elif model_key == 'exponential':
+                p0 = [y_range, 0.01, y_data.min()]
+            elif model_key == 'power_law':
+                p0 = [y_mean, 1.0, 0.0]
+            elif model_key == 'logarithmic':
+                p0 = [y_range / np.log(x_range) if x_range > 1 else 1.0, y_data.min()]
+            elif model_key == 'sine':
+                p0 = [y_range/2, 2*np.pi/x_range if x_range > 0 else 1.0, 0.0, y_mean]
             else:
-                # 스마트 초기값 설정
-                if model_key == 'exponential':
-                    # 지수 함수: b는 작게 시작
-                    p0 = [y_range, 0.01, y_data.min()]
-                elif model_key == 'power_law':
-                    # 거듭제곱: 안전한 초기값
-                    p0 = [y_mean, 1.0, 0.0]
-                elif model_key == 'logarithmic':
-                    p0 = [y_range / np.log(x_range) if x_range > 1 else 1.0, y_data.min()]
-                elif model_key == 'sine':
-                    # 삼각함수: 진폭, 주파수, 위상, 오프셋
-                    p0 = [y_range/2, 2*np.pi/x_range if x_range > 0 else 1.0, 0.0, y_mean]
-                else:
-                    # 기본 초기값 사용
-                    p0 = model_info.get('initial_guess', [1.0] * k)
-                
-                # curve_fit 사용
-                popt, _ = curve_fit(
-                    model_info['func'], 
-                    x_data, 
-                    y_data, 
-                    p0=p0, 
-                    maxfev=5000
-                )
-                y_pred = model_info['func'](x_data, *popt)
+                # 기본 초기값 사용
+                p0 = model_info.get('initial_guess', [1.0] * k)
+            
+            # curve_fit 사용
+            popt, pcov = curve_fit(
+                model_info['func'], 
+                x_data, 
+                y_data, 
+                p0=p0, 
+                maxfev=5000
+            )
+            y_pred = model_info['func'](x_data, *popt)
+            
+            # 표준 오차(Standard Error) 계산
+            # pcov의 대각 성분의 제곱근
+            perr = np.sqrt(np.diag(pcov))
+            standard_errors = perr.tolist()
+
             
             # R² 계산
             r_squared = r2_score(y_data, y_pred)
@@ -185,6 +189,7 @@ def smart_curve_fitting(x_data, y_data, models_to_try=None):
                     'name': model_info['name'],
                     'func': model_info['func'],
                     'params': params_list,
+                    'standard_errors': standard_errors,
                     'equation': model_info['equation'],
                     'description': model_info['description'],
                     'r_squared': r_squared,

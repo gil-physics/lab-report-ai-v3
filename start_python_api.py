@@ -10,7 +10,7 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 # Import and run the API
-from api.analyze import app
+from api.main import app
 import uvicorn
 
 if __name__ == "__main__":
