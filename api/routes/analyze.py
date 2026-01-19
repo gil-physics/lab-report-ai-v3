@@ -150,20 +150,23 @@ async def prepare_report_md(request: Request):
             md_content.append(f"### 1.{idx+1}. {exp_name}")
             md_content.append("")  # Blank line before table
             
-            # Summary Table
-            md_content.append("| 항목 | 내용 |")
-            md_content.append("| :--- | :--- |")
-            md_content.append(f"| 최적 모델 | {analysis.get('model', 'N/A')} |")
-            md_content.append(f"| 회귀 수식 | ${analysis.get('latex', analysis.get('equation', 'N/A'))}$ |")
-            md_content.append(f"| 결정계수 ($R^2$) | {analysis.get('r_squared', 0):.4f} |")
+            # Summary Table - combine all rows into one string
+            table_rows = [
+                "| 항목 | 내용 |",
+                "| :--- | :--- |",
+                f"| 최적 모델 | {analysis.get('model', 'N/A')} |",
+                f"| 회귀 수식 | ${analysis.get('latex', analysis.get('equation', 'N/A'))}$ |",
+                f"| 결정계수 ($R^2$) | {analysis.get('r_squared', 0):.4f} |"
+            ]
             
             if 'params' in analysis and analysis['params']:
                 p_vals = analysis['params']
                 p_errs = analysis.get('standard_errors', [0.0] * len(p_vals))
                 param_names = ['a', 'b', 'c', 'd', 'e']
                 params_md = [f"{param_names[i] if i < 5 else f'p{i}'} = {v:.4f} (± {e:.4f})" for i, (v, e) in enumerate(zip(p_vals, p_errs))]
-                md_content.append(f"| 추정 파라미터 | {', '.join(params_md)} |")
+                table_rows.append(f"| 추정 파라미터 | {', '.join(params_md)} |")
             
+            md_content.append("\n".join(table_rows))  # Join table rows with single newline
             md_content.append("")  # Blank line after table
             
             # 🖼️ Generate Base64 Graphs
@@ -195,7 +198,15 @@ async def prepare_report_md(request: Request):
                 md_content.append("---")
                 md_content.append(footer_part.strip())
 
-        return JSONResponse(content={"status": "success", "markdown": "\n\n".join(md_content)})
+        final_markdown = "\n\n".join(md_content)
+        
+        # Debug: Print first 1000 chars to see table formatting
+        print("=" * 50)
+        print("DEBUG: Generated Markdown Preview:")
+        print(final_markdown[:1500])
+        print("=" * 50)
+        
+        return JSONResponse(content={"status": "success", "markdown": final_markdown})
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
