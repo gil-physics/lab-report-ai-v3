@@ -33,4 +33,5 @@ ENV PORT=8080
 EXPOSE 8080
 
 # Run the unified server
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Using shell form to allow environment variable expansion
+CMD uvicorn api.main:app --host 0.0.0.0 --port $PORT
