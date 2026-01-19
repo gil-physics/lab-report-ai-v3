@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ArrowLeft, Edit3, Eye, Printer, RotateCcw, Save, Trash2, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Edit3, Eye, Printer, RotateCcw, Image as ImageIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -25,7 +25,7 @@ const ReportEditor: React.FC<ReportEditorProps> = ({
     markdown,
     setMarkdown,
     onBack,
-    onPrint,
+    onPrint: _onPrint, // Prefixed with _ to indicate it's intentionally unused as we handle printing locally
     onReset,
     isPreview,
     setIsPreview
