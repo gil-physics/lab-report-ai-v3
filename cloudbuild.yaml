@@ -1,0 +1,26 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/lab-report-ai:$COMMIT_SHA', '.']
+  
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/lab-report-ai:$COMMIT_SHA']
+
+  # (Optional) Deploy to Cloud Run
+  # Uncomment the following lines if you want to deploy automatically from Cloud Build
+  # - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  #   entrypoint: gcloud
+  #   args:
+  #     - 'run'
+  #     - 'deploy'
+  #     - 'lab-report-ai'
+  #     - '--image'
+  #     - 'gcr.io/$PROJECT_ID/lab-report-ai:$COMMIT_SHA'
+  #     - '--region'
+  #     - 'asia-northeast3'
+  #     - '--platform'
+  #     - 'managed'
+
+images:
+  - 'gcr.io/$PROJECT_ID/lab-report-ai:$COMMIT_SHA'
