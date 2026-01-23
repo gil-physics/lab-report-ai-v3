@@ -28,6 +28,12 @@ from fastapi.responses import FileResponse
 # Include routers
 app.include_router(analyze_router, prefix="/api")
 
+# Serve generated plots
+plots_dir = os.path.join(os.path.dirname(__file__), "static", "plots")
+if not os.path.exists(plots_dir):
+    os.makedirs(plots_dir)
+app.mount("/plots", StaticFiles(directory=plots_dir), name="plots")
+
 # Serve static files from the 'static' directory
 # This directory will contain the built frontend files
 static_dir = os.path.join(os.path.dirname(__file__), "static")

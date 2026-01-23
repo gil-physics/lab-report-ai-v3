@@ -1,4 +1,4 @@
-import React from 'react';
+// React import removed
 import { Upload, FileSpreadsheet, Plus, Trash2, AlertCircle } from 'lucide-react';
 import type { DerivedVariable } from '../../types/analysis';
 

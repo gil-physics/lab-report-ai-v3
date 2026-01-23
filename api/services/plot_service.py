@@ -15,6 +15,35 @@ else:
     plt.rcParams['font.family'] = 'NanumGothic'
 plt.rcParams['axes.unicode_minus'] = False
 
+def generate_plot_file(x_data, y_data, save_path, y_pred=None, x_label='X', y_label='Y', title='Plot', x_range=None, y_range=None, color='#3b82f6'):
+    """Generates a matplotlib plot and saves it to a file."""
+    plt.figure(figsize=(8, 6))
+    plt.scatter(x_data, y_data, alpha=0.6, s=50, c=color, label='실험 데이터', edgecolors='white', linewidth=0.5)
+    
+    if y_pred is not None:
+        plt.plot(x_data, y_pred, 'r-', linewidth=2, label='피팅된 곡선', alpha=0.8)
+    
+    plt.xlabel(x_label, fontsize=12, fontweight='bold')
+    plt.ylabel(y_label, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=14, fontweight='bold', pad=15)
+    
+    # Apply ranges
+    if x_range and len(x_range) == 2:
+        if x_range[0] not in ["", None]: plt.xlim(left=float(x_range[0]))
+        if x_range[1] not in ["", None]: plt.xlim(right=float(x_range[1]))
+    if y_range and len(y_range) == 2:
+        if y_range[0] not in ["", None]: plt.ylim(bottom=float(y_range[0]))
+        if y_range[1] not in ["", None]: plt.ylim(top=float(y_range[1]))
+
+    plt.legend(loc='best', frameon=True, shadow=True)
+    plt.grid(True, alpha=0.3, linestyle='--')
+    plt.tight_layout()
+    
+    # Save to file
+    plt.savefig(save_path, format='png', dpi=100, bbox_inches='tight')
+    plt.close()
+    return True
+
 def generate_plot_base64(x_data, y_data, y_pred=None, x_label='X', y_label='Y', title='Plot', x_range=None, y_range=None, color='#3b82f6'):
     """Generates a matplotlib plot and returns it as a Base64 encoded PNG string."""
     plt.figure(figsize=(8, 6))

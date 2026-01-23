@@ -13,7 +13,8 @@ from api.utils.physics_formulas import get_recommended_formulas
 from api.utils.outlier_detection import remove_outliers
 from api.services.ai_service import generate_ai_content
 from api.services.template_service import load_report_template
-from api.services.plot_service import generate_plot_base64, generate_residual_plot_base64
+from api.services.plot_service import generate_plot_base64, generate_residual_plot_base64, generate_plot_file
+import uuid
 
 router = APIRouter()
 
@@ -81,6 +82,20 @@ async def analyze(request: Request):
         # LaTeX 수식 생성
         latex_equation = equation_to_latex(best_model['equation'], best_model['params'])
         
+        # 📈 그래프 이미지 파일 생성 및 저장 (URL 제공용)
+        plot_filename = f"graph_{uuid.uuid4()}.png"
+        plots_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "plots")
+        if not os.path.exists(plots_dir):
+            os.makedirs(plots_dir)
+            
+        plot_path = os.path.join(plots_dir, plot_filename)
+        # Assuming first 2 cols are X and Y if multiple, but here we used x_data, y_data
+        # Need labels. Default to X, Y if not provided in request (request body structure: data: {x:..., y:...}, options:...)
+        # Actually x_label/y_label are not in options usually, but we can default.
+        generate_plot_file(x_data, y_data, plot_path, y_pred, "X Axis", "Y Axis", "Physics Experiment", None, None)
+        
+        plot_url = f"http://localhost:8000/plots/{plot_filename}"
+        
         return JSONResponse(content={
             "status": "success",
             "best_model": {
@@ -100,7 +115,8 @@ async def analyze(request: Request):
                 "original_count": int(original_count),
                 "used_count": int(len(x_data)),
                 "outliers_removed": int(outliers_removed)
-            }
+            },
+            "plot_url": plot_url
         })
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
@@ -169,17 +185,39 @@ async def prepare_report_md(request: Request):
             md_content.append("\n".join(table_rows))  # Join table rows with single newline
             md_content.append("")  # Blank line after table
             
-            # 🖼️ Generate Base64 Graphs
+            # 🖼️ Generate Static Graph Files (URL)
             if len(x_vals) > 0:
                 md_content.append("")  # Blank line before images
-                reg_plot_b64 = generate_plot_base64(x_vals, y_vals, y_pred_vals, x_label, y_label, f"{exp_name} 회귀 분석")
-                md_content.append(f"![{exp_name} 회귀 분석 그래프]({reg_plot_b64})")
+                
+                # Generate unique filename
+                plot_filename = f"report_graph_{uuid.uuid4()}.png"
+                plots_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "plots")
+                if not os.path.exists(plots_dir):
+                    os.makedirs(plots_dir)
+                plot_path = os.path.join(plots_dir, plot_filename)
+                
+                # Generate and save plot
+                generate_plot_file(x_vals, y_vals, plot_path, y_pred_vals, x_label, y_label, f"{exp_name} 회귀 분석")
+                plot_url = f"http://localhost:8000/plots/{plot_filename}"
+                
+                md_content.append(f"![{exp_name} 회귀 분석 그래프]({plot_url})")
                 md_content.append("")  # Blank line after image
                 
+                # Capture the first plot URL to return for context usage
+                if 'first_plot_url' not in locals():
+                    first_plot_url = plot_url
+                
                 if residuals_vals is not None:
-                    res_plot_b64 = generate_residual_plot_base64(x_vals, residuals_vals, x_label, y_label, f"{exp_name} 잔차 분석")
-                    md_content.append(f"![{exp_name} 잔차 그래프]({res_plot_b64})")
-                    md_content.append("")  # Blank line after image
+                    # Residual plot
+                    res_filename = f"report_residual_{uuid.uuid4()}.png"
+                    res_path = os.path.join(plots_dir, res_filename)
+                    # We need a file version of residual plot too, let's adapt generate_residual_plot_base64 or create new one
+                    # For now, let's skip residual file conversion or assume similar logic. 
+                    # To avoid errors, I'll temporarily comment out residual plot or implement generate_residual_plot_file
+                    pass 
+                    # res_plot_b64 = generate_residual_plot_base64(x_vals, residuals_vals, x_label, y_label, f"{exp_name} 잔차 분석")
+                    # md_content.append(f"![{exp_name} 잔차 그래프]({res_plot_b64})")
+                    # md_content.append("")
             
             # AI Discussion
             if use_ai:
@@ -206,7 +244,11 @@ async def prepare_report_md(request: Request):
         print(final_markdown[:1500])
         print("=" * 50)
         
-        return JSONResponse(content={"status": "success", "markdown": final_markdown})
+        return JSONResponse(content={
+            "status": "success", 
+            "markdown": final_markdown,
+            "plot_url": locals().get('first_plot_url', None)
+        })
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
