@@ -197,8 +197,6 @@ export default function ReportEditor() {
                     <div className="flex items-center gap-1 p-1 bg-slate-900 text-white rounded-xl shadow-2xl border border-slate-800 animate-in fade-in zoom-in-95">
                         <button
                             onClick={() => {
-                                const { from, to } = editor.state.selection;
-                                const text = editor.state.doc.textBetween(from, to, ' ');
                                 editor.chain().focus().run();
                                 // Mock AI Rewrite: Just italicize and color for now to show feedback
                                 editor.chain().focus().toggleItalic().run();
