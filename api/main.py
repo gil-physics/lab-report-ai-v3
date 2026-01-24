@@ -34,18 +34,26 @@ if not os.path.exists(plots_dir):
     os.makedirs(plots_dir)
 app.mount("/plots", StaticFiles(directory=plots_dir), name="plots")
 
-# Serve static files from the 'static' directory
-# This directory will contain the built frontend files
 static_dir = os.path.join(os.path.dirname(__file__), "static")
-if os.path.exists(static_dir):
-    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 
+# SPA Routing Support:
+# 1. First, try to serve requested files from 'static' directory (JS, CSS, images, etc.)
+# 2. If file not found, serve 'index.html' to let React Router handle the path
 @app.get("/{full_path:path}")
 async def serve_frontend(full_path: str):
+    # Build complete file path
+    static_file_path = os.path.join(static_dir, full_path)
+    
+    # If it's a real file (like /assets/main.js), serve it
+    if os.path.isfile(static_file_path):
+        return FileResponse(static_file_path)
+    
+    # Otherwise, serve index.html for client-side routing
     index_path = os.path.join(static_dir, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
-    return {"message": "Frontend not built or static directory missing"}
+    
+    return {"error": "Frontend build files not found"}
 
 # Vercel handler (if needed)
 handler = app
