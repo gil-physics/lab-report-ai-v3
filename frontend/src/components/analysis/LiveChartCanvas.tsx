@@ -14,7 +14,7 @@ import {
 import { motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
 import { cn } from '../../lib/utils';
-
+import { useAnalysis } from '../../context/AnalysisContext';
 interface LiveChartCanvasProps {
     data: any[];
     chartType: string;
@@ -22,6 +22,10 @@ interface LiveChartCanvasProps {
     yColumn: string;
     isLogScale?: boolean;
     theme: string;
+    xMin: number | '';
+    xMax: number | '';
+    yMin: number | '';
+    yMax: number | '';
 }
 
 const THEME_COLORS: Record<string, { bg: string; grid: string; gridOpacity: number; axis: string; data: string; dot: string; glow: string; text: string; border: string }> = {
@@ -66,9 +70,15 @@ export default function LiveChartCanvas({
     xColumn,
     yColumn,
     isLogScale = false,
-    theme = 'scientific'
+    theme = 'scientific',
+    xMin,
+    xMax,
+    yMin,
+    yMax
 }: LiveChartCanvasProps) {
+    const { activeUnit } = useAnalysis();
     const colors = THEME_COLORS[theme] || THEME_COLORS.scientific;
+    const trendlineData = activeUnit?.backendAnalysis?.best_model?.trendline || [];
 
     // Prepare data (filter out nulls for selected columns)
     const validData = data.filter(row =>
@@ -118,7 +128,14 @@ export default function LiveChartCanvas({
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={validData} {...commonProps.margin}>
                         <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
-                        <XAxis dataKey={xColumn} type="number" name={xColumn} stroke={colors.axis} tick={{ fontSize: 12 }}>
+                        <XAxis
+                            dataKey={xColumn}
+                            type="number"
+                            name={xColumn}
+                            stroke={colors.axis}
+                            tick={{ fontSize: 12 }}
+                            domain={[xMin === '' ? 'auto' : xMin, xMax === '' ? 'auto' : xMax]}
+                        >
                             <Label value={xColumn} offset={-10} position="insideBottom" />
                         </XAxis>
                         <YAxis
@@ -128,8 +145,8 @@ export default function LiveChartCanvas({
                             stroke={colors.axis}
                             tick={{ fontSize: 12 }}
                             scale={isLogScale ? 'log' : 'auto'}
-                            domain={isLogScale ? ['auto', 'auto'] : ['auto', 'auto']}
-                            allowDataOverflow={isLogScale}
+                            domain={[yMin === '' ? 'auto' : yMin, yMax === '' ? 'auto' : yMax]}
+                            allowDataOverflow={true}
                         >
                             <Label value={yColumn} angle={-90} position="insideLeft" />
                         </YAxis>
@@ -162,7 +179,16 @@ export default function LiveChartCanvas({
                         </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} strokeOpacity={colors.gridOpacity} vertical={false} />
-                    <XAxis dataKey={xColumn} type="number" name={xColumn} stroke={colors.axis} tick={{ fontSize: 11, fill: colors.axis }} axisLine={{ stroke: colors.axis, opacity: 0.3 }} tickLine={false}>
+                    <XAxis
+                        dataKey={xColumn}
+                        type="number"
+                        name={xColumn}
+                        stroke={colors.axis}
+                        tick={{ fontSize: 11, fill: colors.axis }}
+                        axisLine={{ stroke: colors.axis, opacity: 0.3 }}
+                        tickLine={false}
+                        domain={[xMin === '' ? 'auto' : xMin, xMax === '' ? 'auto' : xMax]}
+                    >
                         <Label value={xColumn} offset={-15} position="insideBottom" style={{ fill: colors.axis, fontWeight: 600, fontSize: 11 }} />
                     </XAxis>
                     <YAxis
@@ -174,8 +200,8 @@ export default function LiveChartCanvas({
                         axisLine={{ stroke: colors.axis, opacity: 0.3 }}
                         tickLine={false}
                         scale={isLogScale ? 'log' : 'auto'}
-                        domain={isLogScale ? ['auto', 'auto'] : ['auto', 'auto']}
-                        allowDataOverflow={isLogScale}
+                        domain={[yMin === '' ? 'auto' : yMin, yMax === '' ? 'auto' : yMax]}
+                        allowDataOverflow={true}
                     >
                         <Label value={yColumn} angle={-90} position="insideLeft" style={{ textAnchor: 'middle', fill: colors.axis, fontWeight: 600, fontSize: 11 }} />
                     </YAxis>
@@ -196,6 +222,19 @@ export default function LiveChartCanvas({
                             );
                         }}
                     />
+                    {trendlineData.length > 0 && (
+                        <Line
+                            data={trendlineData}
+                            type="monotone"
+                            dataKey="y"
+                            stroke={colors.dot}
+                            strokeWidth={2}
+                            strokeDasharray="5 5"
+                            dot={false}
+                            activeDot={false}
+                            isAnimationActive={false}
+                        />
+                    )}
                 </ScatterChart>
             </ResponsiveContainer>
         );

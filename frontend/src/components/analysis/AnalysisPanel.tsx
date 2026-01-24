@@ -1,76 +1,23 @@
-import { useMemo } from 'react';
-import { Calculator, TrendingUp, Info } from 'lucide-react';
+import { Calculator, TrendingUp, Info, Loader2 } from 'lucide-react';
+import { useAnalysis } from '../../context/AnalysisContext';
 import * as Popover from '@radix-ui/react-popover';
 // import { cn } from '../../lib/utils'; // Unused
 // import { getTheme } from '../../lib/theme'; // Unused
 
-interface AnalysisPanelProps {
-    data: any[];
-    xColumn: string;
-    yColumn: string;
-}
 
-export default function AnalysisPanel({ data, xColumn, yColumn }: AnalysisPanelProps) {
-    // const theme = getTheme(2); // Unused
 
-    // Calculate Regression Stats
-    const stats = useMemo(() => {
-        if (!xColumn || !yColumn || data.length === 0) return null;
+export default function AnalysisPanel() {
+    const { activeUnit, isAnalyzing } = useAnalysis();
+    const stats = activeUnit?.backendAnalysis?.best_model;
 
-        const points = data
-            .filter(d => d[xColumn] !== undefined && d[yColumn] !== undefined)
-            .map(d => [Number(d[xColumn]), Number(d[yColumn])]);
-
-        if (points.length < 2) return null;
-
-        const n = points.length;
-        let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0, sumYY = 0;
-
-        for (const [x, y] of points) {
-            sumX += x;
-            sumY += y;
-            sumXY += x * y;
-            sumXX += x * x;
-            sumYY += y * y;
-        }
-
-        const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-        const intercept = (sumY - slope * sumX) / n;
-
-        // R-squared
-        // const ssTot = sumYY - (sumY * sumY) / n; // Unused
-        // const ssRes = sumYY - slope * sumXY - intercept * sumY; // Unused
-        // More robust R2 calculation:
-        // SST = sum((y - y_mean)^2)
-        // SSR = sum((y_pred - y_mean)^2) or SSE = sum((y - y_pred)^2)
-        // R2 = 1 - SSE/SST
-
-        const yMean = sumY / n;
-        let sse = 0;
-        let sst = 0;
-
-        points.forEach(([x, y]) => {
-            const yPred = slope * x + intercept;
-            sse += Math.pow(y - yPred, 2);
-            sst += Math.pow(y - yMean, 2);
-        });
-
-        const rSquared = 1 - (sse / sst);
-
-        // Residuals Stats
-        const residuals = points.map(([x, y]) => y - (slope * x + intercept));
-        const maxRes = Math.max(...residuals.map(Math.abs));
-        // const meanRes = residuals.reduce((a, b) => a + b, 0) / n; // Unused
-
-        return {
-            n,
-            slope: slope.toFixed(4),
-            intercept: intercept.toFixed(4),
-            rSquared: rSquared.toFixed(4),
-            sse: sse.toFixed(4),
-            maxResidual: maxRes.toFixed(4)
-        };
-    }, [data, xColumn, yColumn]);
+    if (isAnalyzing) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center p-6 text-slate-400 bg-slate-50/50 rounded-xl border border-slate-100 border-dashed animate-pulse">
+                <Loader2 size={32} className="mb-2 opacity-50 animate-spin text-blue-500" />
+                <p className="text-sm font-bold">Python 분석 엔진 가동 중...</p>
+            </div>
+        );
+    }
 
     if (!stats) {
         return (
@@ -85,8 +32,8 @@ export default function AnalysisPanel({ data, xColumn, yColumn }: AnalysisPanelP
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                 <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                    <TrendingUp size={16} className="text-violet-500" />
-                    Linear Regression Results
+                    <TrendingUp size={16} className="text-blue-500" />
+                    Python 기반 정밀 분석 결과 ({stats.name})
                 </h3>
                 <Popover.Root>
                     <Popover.Trigger asChild>
@@ -105,23 +52,23 @@ export default function AnalysisPanel({ data, xColumn, yColumn }: AnalysisPanelP
 
             <div className="p-5 grid grid-cols-2 md:grid-cols-4 gap-4">
                 {/* Equation */}
-                <div className="col-span-2 p-3 bg-violet-50/50 rounded-lg border border-violet-100/50">
-                    <div className="text-xs font-semibold text-violet-500 uppercase tracking-wide mb-1">Model Equation</div>
-                    <div className="font-mono text-lg font-bold text-slate-800">
-                        y = <span className="text-violet-600">{stats.slope}</span>x + <span className="text-violet-600">{stats.intercept}</span>
+                <div className="col-span-2 p-3 bg-blue-50/50 rounded-lg border border-blue-100/50">
+                    <div className="text-xs font-semibold text-blue-500 uppercase tracking-wide mb-1">Recommended Model Equation</div>
+                    <div className="font-mono text-base font-bold text-slate-800 break-all bg-white/50 p-2 rounded border border-blue-100/30">
+                        {stats.latex}
                     </div>
                 </div>
 
                 {/* R-Squared */}
                 <div className="p-3 bg-white rounded-lg border border-slate-100 shadow-sm">
                     <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">R-Squared</div>
-                    <div className="text-2xl font-bold text-slate-800">{stats.rSquared}</div>
+                    <div className="text-xl font-bold text-slate-800">{stats.r_squared.toFixed(4)}</div>
                 </div>
 
-                {/* Residuals */}
+                {/* AIC or count */}
                 <div className="p-3 bg-white rounded-lg border border-slate-100 shadow-sm">
-                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Max Residual</div>
-                    <div className="text-2xl font-bold text-slate-800">{stats.maxResidual}</div>
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Fit Accuracy (AIC)</div>
+                    <div className="text-xl font-bold text-slate-800">{stats.aic.toFixed(2)}</div>
                 </div>
             </div>
         </div>

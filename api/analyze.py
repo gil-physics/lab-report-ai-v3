@@ -96,7 +96,7 @@ def enforce_spacing_rules(text):
 
 
 # Define AI Content Generator Helper
-async def generate_ai_content(exp_name, analysis, template_id, template_content=None):
+async def generate_ai_content(exp_name, analysis, template_id, template_content=None, raw_data_summary=None):
     if not GOOGLE_API_KEY:
         return "AI API 키가 설정되지 않아 내용을 생성할 수 없습니다."
     
@@ -107,6 +107,19 @@ async def generate_ai_content(exp_name, analysis, template_id, template_content=
         template_context = ""
         if template_content:
             template_context = f"\n[참고할 보고서 템플릿 구조]\n{template_content}\n"
+
+        # 📊 데이터 통계 요약 정보 생성
+        data_desc = ""
+        example_citation = ""
+        if raw_data_summary:
+            data_desc = f"""
+            [실험 데이터 통계 요약]
+            - 데이터 개수: {raw_data_summary.get('count', 0)} 개
+            - X값 범위: {raw_data_summary.get('x_min', 0):.4f} ~ {raw_data_summary.get('x_max', 0):.4f}
+            - Y값 범위: {raw_data_summary.get('y_min', 0):.4f} ~ {raw_data_summary.get('y_max', 0):.4f}
+            - Y값 평균: {raw_data_summary.get('y_mean', 0):.4f} (표준편차: {raw_data_summary.get('y_std', 0):.4f})
+            """
+            example_citation = f"예: \"측정된 Y값은 평균 {raw_data_summary.get('y_mean', 0):.2f}를 중심으로 {raw_data_summary.get('y_min', 0):.2f}에서 {raw_data_summary.get('y_max', 0):.2f} 사이의 범위를 보였습니다.\""
 
         # 🧠 AI 프롬프트 고도화 (데이터 주입): 환각 방지를 위해 명확한 수치 제공
         params_info = []
@@ -121,40 +134,33 @@ async def generate_ai_content(exp_name, analysis, template_id, template_content=
         params_text = f"주요 파라미터 상세 값: {', '.join(params_info)}" if params_info else ""
 
         prompt = f"""
-        당신은 대학교 물리학 실험 조교(TA)이자 전문 연구원입니다. 아래 실험 데이터와 제공된 템플릿 구조를 바탕으로 학술 보고서의 '결과 분석 및 토의' 섹션을 작성해주세요.
+        당신은 대학교 물리학 실험 조교(TA)이자 전문 연구원입니다. 아래 **실제 실험 데이터 통계**와 분석 결과를 바탕으로 보고서의 '결과 분석 및 토의' 섹션을 작성하세요.
         {template_context}
         
-        [실험 데이터 정보]
+        {data_desc}
+
+        [분석 결과 정보]
         실험 주제: {exp_name}
         적용된 물리 이론: {template_id if template_id != 'none' else '기본 물리학 법칙'}
-        회귀 모델: {analysis.get('model')}
-        도출된 수식: {analysis.get('equation')}
+        회귀 모델: {analysis.get('name', analysis.get('model', 'N/A'))}
+        도출된 수식: {analysis.get('equation', 'N/A')}
         결정계수 (R²): {analysis.get('r_squared', 0):.4f}
         {params_text}
 
         [작성 가이드라인]
-        1. **수식 표현 규칙 (매우 중요)**: 
-           - **문장 중간 수식($)**: 변수나 간단한 식은 $ 기호를 사용하세요. (예: $F=ma$)
-           - **독립된 수식($$)**: 복잡한 수식은 반드시 **앞뒤로 줄바꿈(Enter)**을 하여 독립된 줄에 작성해야만 이미지가 생성됩니다.
-             (잘못된 예: 따라서 식은 $$ E=mc^2 $$ 이다.)
-             (올바른 예:
-              따라서 식은 다음과 같습니다.
-              
-              $$ E=mc^2 $$
-              
-              이 결과는...)
-        2. **데이터 정밀도 평가**: 파라미터의 표준오차(Standard Error)와 R² 값을 바탕으로 실험의 정밀도와 불확실성을 평가하세요. 오차가 작으면 실험의 숙련도나 장비의 정확성을 칭찬하고, 크면 구체적인 개선안을 제시하세요.
-        3. **템플릿 준수**: 제공된 템플릿에 '[LLM 작성]' 또는 '{{변수}}'라고 표시된 부분의 내용을 학술적인 문체로 채워넣으세요.
-        4. **오차 원인 분석**: R² 값을 바탕으로 실험의 정밀도를 평가하고, 실제 물리적 제약(공기저항, 마찰 등)에 따른 오차 원인을 논리적으로 추론하세요.
+        1. **구체적 수치 인용 (필수)**: 추상적인 표현 대신 위 '실험 데이터 통계 요약'에 있는 **구체적인 수치(최대/최소/평균/표준편차 등)**를 문장에 반드시 인용하세요. 
+           - {example_citation if example_citation else '데이터 정밀도와 신뢰성을 수치적으로 제시하십시오.'}
+        2. **수식 표현 규칙 (매우 중요)**: 
+           - **외부 공백 필수**: 수식 기호($)와 앞뒤 글자 사이에는 **반드시 공백을 한 칸** 두세요. (예: ( $R^2$ ), 값은 $x$ 이다)
+           - **내부 공백 금지**: 수식 기호($) 바로 안쪽에는 공백이 없어야 합니다. (예: $R^2$, $E=mc^2$)
+           - **독립된 수식($$)**: 복잡한 수식은 앞뒤로 빈 줄을 두어 독립된 줄에 작성하세요.
+        3. **데이터 정밀도 평가**: 표준오차와 R² 값을 바탕으로 실험의 정밀도를 수치적으로 평가하세요.
+        4. **오차 원인 분석**: 실제 물리적 제약에 따른 오차 원인을 논리적으로 추론하세요.
         5. **가독성**: 중요한 포인트는 불렛 포인트(-)와 굵은 글씨(**)를 사용하여 강조하세요.
 
-        [한글/LaTeX 출력 규칙]
-        - **수식($)**: 수식 기호($)는 앞뒤 글자와 한 칸 띄어서 작성하세요. (예: "결과는 $E=mc^2$ 입니다")
-        - **강조(**)**: 강조할 단어는 앞뒤 글자와 공백 없이 붙여서 작성하세요. (예: "**결론**은")
-
         [톤 앤 매너]
-        - 명확하고 학구적인 '하십시오체'를 사용하세요.
-        - 마크다운 문법(Heading, Bold, List)을 적절히 섞어서 작성하세요.
+        - 전문적이고 학구적인 '하십시오체'를 사용하세요.
+        - 마크다운 문법을 적절히 활용하세요.
         """
         
         response = await model.generate_content_async(prompt)
@@ -169,6 +175,7 @@ sys.path.append(os.path.dirname(__file__))
 from utils.curve_fitting import smart_curve_fitting, equation_to_latex
 from utils.physics_formulas import get_recommended_formulas
 from utils.outlier_detection import remove_outliers
+from services.plot_service import generate_plot_file, generate_residual_plot_file
 
 app = FastAPI(
     title="Easy-Lab-Plotter Analysis API",
@@ -420,20 +427,52 @@ async def prepare_report_md(request: Request):
             md_content.append(theory_part.strip())
             md_content.append("\n---\n")
 
+        # Determine base URL for static files (plots)
+        host = request.headers.get("host", "localhost:8000")
+        protocol = "https" if request.headers.get("x-forwarded-proto") == "https" else "http"
+        base_url = f"{protocol}://{host}"
+
         # Analysis Results Section
         md_content.append("## 1. 실험 결과 및 분석\n")
         
         for idx, item in enumerate(items):
             exp_name = item.get('experiment_name', f'실험 {idx+1}')
-            analysis = item.get('analysis', {})
+            data = item.get('data', {})
+            x_label = item.get('x_label', 'X')
+            y_label = item.get('y_label', 'Y')
+            
+            # Regression Data (Raw)
+            x_vals = np.array(data.get('x', []), dtype=float)
+            y_vals = np.array(data.get('y', []), dtype=float)
+            
+            mask = ~np.isnan(x_vals) & ~np.isnan(y_vals)
+            x_vals = x_vals[mask]
+            y_vals = y_vals[mask]
+
+            print(f"DEBUG [prepare-report-md]: Data count={len(x_vals)}, X={x_label}")
+
+            if len(x_vals) < 2:
+                continue
+
+            # 🛠️ ALWAYS use Python to recalculate analysis for the final report (Source of Truth)
+            analysis = smart_curve_fitting(x_vals, y_vals)
+            if not analysis:
+                continue
+                
+            # LaTeX 수식 생성
+            latex_equation = equation_to_latex(analysis['equation'], analysis['params'])
+            
+            # Prediction for plotting
+            y_pred_vals = analysis['func'](x_vals, *analysis['params'])
+            residuals_vals = y_vals - y_pred_vals
             
             md_content.append(f"### 1.{idx+1}. {exp_name}\n")
             
             # Summary Table
             md_content.append("| 항목 | 내용 |")
             md_content.append("| :--- | :--- |")
-            md_content.append(f"| 최적 모델 | {analysis.get('model', 'N/A')} |")
-            md_content.append(f"| 회귀 수식 | ${analysis.get('latex', analysis.get('equation', 'N/A'))}$ |")
+            md_content.append(f"| 최적 모델 | {analysis.get('name', 'N/A')} |")
+            md_content.append(f"| 회귀 수식 | ${latex_equation}$ |")
             md_content.append(f"| 결정계수 ($R^2$) | {analysis.get('r_squared', 0):.4f} |")
             
             # Parameters
@@ -451,14 +490,42 @@ async def prepare_report_md(request: Request):
             
             md_content.append("\n")
             
-            # Graph Placeholders
-            md_content.append(f"![{exp_name} 회귀 분석 그래프](regression_plot_{idx})\n")
-            md_content.append(f"![{exp_name} 잔차 그래프](residual_plot_{idx})\n")
+            # 🖼️ Generate Static Graph Files using Matplotlib (Quality over Speed)
+            plot_filename = f"report_graph_{uuid.uuid4()}.png"
+            res_filename = f"report_residual_{uuid.uuid4()}.png"
+            
+            # Directory setup
+            plots_dir = os.path.join(os.path.dirname(__file__), "static", "plots")
+            if not os.path.exists(plots_dir):
+                os.makedirs(plots_dir)
+            
+            # Save files
+            generate_plot_file(x_vals, y_vals, os.path.join(plots_dir, plot_filename), y_pred_vals, x_label, y_label, f"{exp_name} 회귀 분석")
+            generate_residual_plot_file(x_vals, residuals_vals, os.path.join(plots_dir, res_filename), x_label, y_label, f"{exp_name} 잔차 분석")
+            
+            # Markdown links
+            md_content.append(f"![{exp_name} 회귀 분석 그래프]({base_url}/plots/{plot_filename})\n")
+            md_content.append(f"![{exp_name} 잔차 그래프]({base_url}/plots/{res_filename})\n")
+
+            # Capture the first plot URL to return for context usage
+            if 'first_plot_url' not in locals():
+                first_plot_url = f"{base_url}/plots/{plot_filename}"
             
             # AI Discussion
             if use_ai:
+                # 📊 원본 데이터 통계 계산 추가
+                raw_data_summary = {
+                    "count": int(len(x_vals)),
+                    "x_min": float(np.min(x_vals)),
+                    "x_max": float(np.max(x_vals)),
+                    "y_min": float(np.min(y_vals)),
+                    "y_max": float(np.max(y_vals)),
+                    "y_mean": float(np.mean(y_vals)),
+                    "y_std": float(np.std(y_vals))
+                }
+
                 md_content.append(f"#### 📊 AI 실험 결과 분석 및 고찰 ({exp_name})\n")
-                ai_content = await generate_ai_content(exp_name, analysis, template, template_content)
+                ai_content = await generate_ai_content(exp_name, analysis, template, template_content, raw_data_summary)
                 md_content.append(ai_content)
                 md_content.append("\n")
 
@@ -476,7 +543,8 @@ async def prepare_report_md(request: Request):
 
         return JSONResponse(content={
             "status": "success",
-            "markdown": "\n".join(md_content)
+            "markdown": "\n".join(md_content),
+            "plot_url": locals().get('first_plot_url', None)
         })
         
     except Exception as e:

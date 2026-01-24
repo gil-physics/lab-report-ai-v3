@@ -165,13 +165,14 @@ def smart_curve_fitting(x_data, y_data, models_to_try=None):
             else:
                 adj_r_squared = r_squared
             
-            # 차수 페널티 점수: R² * (1 - 0.3 * 파라미터 개수)
-            # 높을수록 좋음 - 단순한 모델 매우 강하게 선호 (0.2 → 0.3)
-            penalty_score = r_squared * (1 - 0.3 * k)
+            # 차수 페널티 점수: R² * (1 - 0.02 * 파라미터 개수)
+            # 높을수록 좋음 - 복잡한 모델에 대한 페널티 대폭 완화 (0.1 -> 0.02)
+            # 2차 함수 등 정확도가 높은 모델이 선형 모델보다 우선 선택되도록 함
+            penalty_score = r_squared * (1 - 0.02 * k)
             
-            # 선형 모델에 추가 보너스 (R² > 0.90이면)
-            if model_key == 'linear' and r_squared > 0.90:
-                penalty_score *= 1.15  # 15% 보너스 (5% → 15%)
+            # 선형 모델 가산점 제거 (비선형 모델과 공정하게 경쟁)
+            # if model_key == 'linear' and r_squared > 0.90:
+            #     penalty_score *= 1.15
             
             
             # 유효한 결과만 저장
@@ -184,6 +185,15 @@ def smart_curve_fitting(x_data, y_data, models_to_try=None):
                 else:
                     params_list = list(np.array(popt))
                 
+                # 시각화용 트렌드라인 포인트 생성 (X 범위 내 50개 점)
+                x_min, x_max = x_data.min(), x_data.max()
+                x_range = x_max - x_min
+                # 약간의 여유(5%) 추가
+                x_trend = np.linspace(x_min - x_range*0.05, x_max + x_range*0.05, 50)
+                y_trend = model_info['func'](x_trend, *params_list)
+                
+                trendline = [{"x": float(x), "y": float(y)} for x, y in zip(x_trend, y_trend)]
+
                 results.append({
                     'model_key': model_key,
                     'name': model_info['name'],
@@ -196,7 +206,8 @@ def smart_curve_fitting(x_data, y_data, models_to_try=None):
                     'adj_r_squared': adj_r_squared,
                     'aic': aic,
                     'param_count': k,
-                    'penalty_score': penalty_score
+                    'penalty_score': penalty_score,
+                    'trendline': trendline
                 })
         
         except Exception as e:

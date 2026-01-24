@@ -1,5 +1,6 @@
 import { Extension } from '@tiptap/core';
 import Suggestion from '@tiptap/suggestion';
+import type { MutableRefObject } from 'react';
 
 export const Commands = Extension.create({
     name: 'commands',
@@ -25,8 +26,10 @@ export const Commands = Extension.create({
     },
 });
 
-export const createSuggestionItems = (stats: any, plotUrl?: string | null) => {
+export const createSuggestionItems = (statsRef: MutableRefObject<any>, plotUrlRef: MutableRefObject<string | null>) => {
     return ({ query }: { query: string }) => {
+        const stats = statsRef.current;
+        const plotUrl = plotUrlRef.current;
         const items = [
             {
                 title: 'Insert Graph',
@@ -37,11 +40,12 @@ export const createSuggestionItems = (stats: any, plotUrl?: string | null) => {
                         .chain()
                         .focus()
                         .deleteRange(range)
-                        .setImage({ src: plotUrl || 'https://placehold.co/600x400/2563eb/FFF?text=Physics+Graph+Visualized' })
+                        .setImage({ src: plotUrl || 'https://placehold.co/600x400/f8fafc/64748b?text=Please+Analyze+Data+First' })
                         .run();
                 },
             },
             ...(stats ? [
+                // ... (rest same)
                 {
                     title: 'Slope',
                     description: `Insert slope value (${stats.slope})`,

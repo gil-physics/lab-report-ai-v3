@@ -9,7 +9,7 @@ export default function NavigationControls() {
     const navigate = useNavigate();
     const location = useLocation();
     const {
-        parsedData,
+        units,
         generatedMarkdown,
         isGeneratingReport,
     } = useAnalysis();
@@ -41,12 +41,12 @@ export default function NavigationControls() {
     };
 
     const canProceed = () => {
-        if (currentStep === 1) return parsedData.length > 0;
+        if (currentStep === 1) return units.length > 0;
         // Add logic for step 2 verification later
         return true;
     };
 
-    if (currentStep === 1 && parsedData.length === 0) return null;
+    if (currentStep === 1 && units.length === 0) return null;
 
     return (
         <>

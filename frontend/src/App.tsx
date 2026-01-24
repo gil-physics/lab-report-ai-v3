@@ -1,23 +1,15 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import SmartDropzone from './components/analysis/SmartDropzone';
-import DataSummaryGrid from './components/analysis/DataSummaryGrid';
 import VisualBuilder from './components/analysis/VisualBuilder';
 import ReportEditor from './components/reports/ReportEditor';
-import { useAnalysis } from './context/AnalysisContext';
 
 function UploadStep() {
-  const { parsedData } = useAnalysis();
-
   return (
     <div className="h-full p-8 max-w-7xl mx-auto w-full">
-      {parsedData.length === 0 ? (
-        <div className="max-w-xl mx-auto mt-20">
-          <SmartDropzone />
-        </div>
-      ) : (
-        <DataSummaryGrid parsedData={parsedData} />
-      )}
+      <div className="max-w-xl mx-auto mt-20">
+        <SmartDropzone />
+      </div>
     </div>
   );
 }

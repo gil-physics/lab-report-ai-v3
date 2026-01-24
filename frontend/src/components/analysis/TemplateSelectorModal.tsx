@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, ChevronRight, FileText, Beaker, Sparkles, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAnalysis } from '../../context/AnalysisContext';
 import axios from 'axios';
 
@@ -39,13 +40,15 @@ interface TemplateSelectorModalProps {
 
 export default function TemplateSelectorModal({ isOpen, onOpenChange }: TemplateSelectorModalProps) {
     const {
-        parsedData,
-        analysisResult,
+        units,
+        activeUnit,
+        activeChart,
         setGeneratedMarkdown,
         setIsGeneratingReport,
         setGenerationProgress,
         setPlotUrl
     } = useAnalysis();
+    const navigate = useNavigate();
     const [step, setStep] = useState<'category' | 'topic'>('category');
 
     const handleCategorySelect = (id: string) => {
@@ -58,22 +61,69 @@ export default function TemplateSelectorModal({ isOpen, onOpenChange }: Template
 
     const generateReport = async (templateId: string) => {
         // Prepare for background generation
-        setGeneratedMarkdown(''); // Clear previous report to trigger loading state if viewed
+        setGeneratedMarkdown('');
         setIsGeneratingReport(true);
         setGenerationProgress('Analyzing experiment data...');
-        onOpenChange(false); // Close modal immediately as requested
+
+        // Immediate UI feedback
+        onOpenChange(false);
+        navigate('/report'); // Auto-navigate to report page
 
         try {
-            const items = [{
-                experiment_name: templateId === 'none' ? 'data analysis' : templateId.replace(/_/g, ' '),
-                analysis: analysisResult || {},
-                data: {
-                    x: parsedData.map(d => d[Object.keys(d)[0]]),
-                    y: parsedData.map(d => d[Object.keys(d)[1]]),
-                },
-                x_label: Object.keys(parsedData[0])[0],
-                y_label: Object.keys(parsedData[0])[1],
-            }];
+            const items: any[] = [];
+
+            // 🔄 Iterate through all units and all charts within them
+            units.forEach(unit => {
+                // Calculate enriched data for this unit (derived variables)
+                const unitData = unit.data;
+                const dvs = unit.derivedVariables;
+                const enrichedUnitData = unitData.map(row => {
+                    const newRow = { ...row };
+                    dvs.forEach(dv => {
+                        if (!dv.name || !dv.formula) return;
+                        try {
+                            const keys = Object.keys(row);
+                            const values = keys.map(k => row[k]);
+                            // 🔍 Check if keys are valid JS identifiers
+                            const isValidIdentifier = (s: string) => /^[a-zA-Z_$][0-9a-zA-Z_$]*$/.test(s);
+                            const safeKeys = keys.filter(isValidIdentifier);
+                            if (safeKeys.length === keys.length) {
+                                const fn = new Function(...keys, `return ${dv.formula}`);
+                                const result = fn(...values);
+                                newRow[dv.name] = isNaN(result) ? null : result;
+                            } else {
+                                // Fallback: just skip for now to avoid crash
+                                // Ideally we'd use a parser here
+                            }
+                        } catch (e) { newRow[dv.name] = null; }
+                    });
+                    return newRow;
+                });
+
+                unit.charts.forEach(chart => {
+                    const xKey = chart.xColumn;
+                    const yKey = chart.yColumn;
+
+                    items.push({
+                        experiment_name: `${unit.name} - ${chart.name}`,
+                        analysis: unit.backendAnalysis || {}, // Last cached analysis for this unit
+                        data: {
+                            x: enrichedUnitData.map(d => Number(d[xKey])).filter(v => !isNaN(v)),
+                            y: enrichedUnitData.map(d => Number(d[yKey])).filter(v => !isNaN(v)),
+                        },
+                        x_label: xKey,
+                        y_label: yKey,
+                        x_range: [chart.xMin, chart.xMax],
+                        y_range: [chart.yMin, chart.yMax],
+                        is_log_scale: chart.isLogScale
+                    });
+                });
+            });
+
+            if (items.length === 0 && activeUnit && activeChart) {
+                // Fallback to active if no charts found (shouldn't happen with current logic)
+                // ... (simplified fallback logic if needed)
+            }
 
             setGenerationProgress('AI is creating the report draft...');
             const response = await axios.post('http://localhost:8000/api/prepare-report-md', {

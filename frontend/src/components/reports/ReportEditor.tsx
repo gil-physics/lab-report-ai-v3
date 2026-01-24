@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useEditor, EditorContent, ReactRenderer } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
@@ -6,27 +7,171 @@ import { Markdown } from 'tiptap-markdown';
 import { Mathematics } from '@tiptap/extension-mathematics';
 import Placeholder from '@tiptap/extension-placeholder';
 import BubbleMenuExtension from '@tiptap/extension-bubble-menu';
+import Underline from '@tiptap/extension-underline';
+import { migrateMathStrings } from '@tiptap/extension-mathematics';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableHeader } from '@tiptap/extension-table-header';
+import { TableCell } from '@tiptap/extension-table-cell';
+import Image from '@tiptap/extension-image';
+import Highlight from '@tiptap/extension-highlight';
+import TextAlign from '@tiptap/extension-text-align';
 import tippy from 'tippy.js';
 import 'tippy.js/dist/tippy.css';
+import 'katex/dist/katex.min.css';
 import {
-    Download,
     Sparkles,
     Strikethrough,
     Type,
     RotateCcw,
-    FileDown,
     Maximize2,
     FileText as FileTextIcon,
-    Printer
+    Bold,
+    Italic,
+    Underline as UnderlineIcon,
+    Heading1,
+    Heading2,
+    List,
+    Undo2,
+    Redo2,
+    Table as TableIcon,
+    Quote,
+    Trash2,
+    Code,
+    Loader2,
+    Beaker,
+    AlignLeft,
+    AlignCenter,
+    AlignRight,
+    Highlighter,
+    Sigma,
+    Rows,
+    Columns
 } from 'lucide-react';
 import { useAnalysis } from '../../context/AnalysisContext';
 import { cn } from '../../lib/utils';
 import { Commands, createSuggestionItems } from './commands';
 import CommandsList from './CommandsList';
-import { Loader2, Beaker } from 'lucide-react';
+const Toolbar = ({ editor }: { editor: any }) => {
+    if (!editor) return null;
+
+    const btnClass = (active: boolean) => cn(
+        "p-2.5 rounded-xl transition-all hover:bg-slate-100 flex items-center justify-center",
+        active ? "bg-emerald-50 text-emerald-600 shadow-sm border border-emerald-100" : "text-slate-500 border border-transparent"
+    );
+
+    const sectionClass = "flex flex-col gap-1 pb-3 mb-3 border-b border-slate-100 last:border-0 last:mb-0 last:pb-0";
+
+    const insertMath = (block = false) => {
+        const { from, to } = editor.state.selection;
+        const text = editor.state.doc.textBetween(from, to, ' ');
+        const wrapped = block ? `\n\n\$$ ${text} \$$\n\n` : `\$ ${text} \$`;
+        editor.chain().focus().insertContent(wrapped).run();
+    };
+
+    return (
+        <aside className="fixed top-1/2 -translate-y-1/2 right-6 z-50 no-print">
+            <div className="flex flex-col p-2 bg-white/90 backdrop-blur-xl border border-slate-200 rounded-3xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] w-14">
+                {/* History */}
+                <div className={sectionClass}>
+                    <button onClick={() => editor.chain().focus().undo().run()} className={btnClass(false)} title="Undo (Ctrl+Z)">
+                        <Undo2 size={18} />
+                    </button>
+                    <button onClick={() => editor.chain().focus().redo().run()} className={btnClass(false)} title="Redo">
+                        <Redo2 size={18} />
+                    </button>
+                </div>
+
+                {/* Headings / Structure */}
+                <div className={sectionClass}>
+                    <button onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} className={btnClass(editor.isActive('heading', { level: 1 }))} title="H1">
+                        <Heading1 size={18} />
+                    </button>
+                    <button onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={btnClass(editor.isActive('heading', { level: 2 }))} title="H2">
+                        <Heading2 size={18} />
+                    </button>
+                    <button onClick={() => editor.chain().focus().toggleBlockquote().run()} className={btnClass(editor.isActive('blockquote'))} title="Quote">
+                        <Quote size={18} />
+                    </button>
+                </div>
+
+                {/* Basic Formatting */}
+                <div className={sectionClass}>
+                    <button onClick={() => editor.chain().focus().toggleBold().run()} className={btnClass(editor.isActive('bold'))} title="Bold">
+                        <Bold size={18} />
+                    </button>
+                    <button onClick={() => editor.chain().focus().toggleItalic().run()} className={btnClass(editor.isActive('italic'))} title="Italic">
+                        <Italic size={18} />
+                    </button>
+                    <button onClick={() => editor.chain().focus().toggleUnderline().run()} className={btnClass(editor.isActive('underline'))} title="Underline">
+                        <UnderlineIcon size={18} />
+                    </button>
+                    <button onClick={() => editor.chain().focus().toggleHighlight().run()} className={btnClass(editor.isActive('highlight'))} title="Highlight">
+                        <Highlighter size={18} />
+                    </button>
+                </div>
+
+                {/* Alignment */}
+                <div className={sectionClass}>
+                    <button onClick={() => editor.chain().focus().setTextAlign('left').run()} className={btnClass(editor.isActive({ textAlign: 'left' }))} title="Align Left">
+                        <AlignLeft size={18} />
+                    </button>
+                    <button onClick={() => editor.chain().focus().setTextAlign('center').run()} className={btnClass(editor.isActive({ textAlign: 'center' }))} title="Align Center">
+                        <AlignCenter size={18} />
+                    </button>
+                    <button onClick={() => editor.chain().focus().setTextAlign('right').run()} className={btnClass(editor.isActive({ textAlign: 'right' }))} title="Align Right">
+                        <AlignRight size={18} />
+                    </button>
+                </div>
+
+                {/* Math / TeX */}
+                <div className={sectionClass}>
+                    <button onClick={() => insertMath(false)} className={btnClass(false)} title="TeX Math (Inline)">
+                        <Sigma size={18} className="text-blue-600" />
+                    </button>
+                    <button onClick={() => editor.chain().focus().toggleCodeBlock().run()} className={btnClass(editor.isActive('codeBlock'))} title="Code Block">
+                        <Code size={18} />
+                    </button>
+                </div>
+
+                {/* Lists */}
+                <div className={sectionClass}>
+                    <button onClick={() => editor.chain().focus().toggleBulletList().run()} className={btnClass(editor.isActive('bulletList'))} title="Bullet List">
+                        <List size={18} />
+                    </button>
+                </div>
+
+                {/* Tables */}
+                <div className={sectionClass}>
+                    <button
+                        onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+                        className={btnClass(editor.isActive('table'))}
+                        title="Insert Table"
+                    >
+                        <TableIcon size={18} />
+                    </button>
+                    {editor.isActive('table') && (
+                        <>
+                            <button onClick={() => editor.chain().focus().addRowAfter().run()} className={btnClass(false)} title="Add Row Below">
+                                <Rows size={18} className="text-emerald-500" />
+                            </button>
+                            <button onClick={() => editor.chain().focus().addColumnAfter().run()} className={btnClass(false)} title="Add Column Right">
+                                <Columns size={18} className="text-emerald-500" />
+                            </button>
+                            <button onClick={() => editor.chain().focus().deleteTable().run()} className={btnClass(false)} title="Delete Table">
+                                <Trash2 size={18} className="text-red-400" />
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
+        </aside>
+    );
+};
 
 export default function ReportEditor() {
     const {
+        units,
         generatedMarkdown,
         setGeneratedMarkdown,
         resetAnalysis,
@@ -35,75 +180,109 @@ export default function ReportEditor() {
         analysisStats,
         plotUrl
     } = useAnalysis();
+    const navigate = useNavigate();
     const [isZenMode, setIsZenMode] = useState(true);
+    const plotUrlRef = useRef<string | null>(plotUrl);
+
+    useEffect(() => {
+        plotUrlRef.current = plotUrl;
+    }, [plotUrl]);
+
+    // 🛡️ Refresh Guard: Redirect ONLY if data is completely lost (e.g. refresh)
+    useEffect(() => {
+        if (units.length === 0) {
+            navigate('/visualize', { replace: true });
+        }
+    }, [units.length, navigate]);
+
+    const statsRef = useRef(analysisStats);
+    useEffect(() => {
+        statsRef.current = analysisStats;
+    }, [analysisStats]);
+
+    const extensions = useMemo(() => [
+        StarterKit,
+        Markdown,
+        Mathematics.configure({
+            katexOptions: {
+                throwOnError: false,
+            },
+        }),
+        BubbleMenuExtension,
+        Underline,
+        Table.configure({ resizable: true }),
+        TableRow,
+        TableHeader,
+        TableCell,
+        Image,
+        Highlight,
+        TextAlign.configure({
+            types: ['heading', 'paragraph'],
+        }),
+        Placeholder.configure({
+            placeholder: "Type '/' for commands, or select text for AI tools...",
+        }),
+        Commands.configure({
+            suggestion: {
+                items: createSuggestionItems(statsRef, plotUrlRef),
+                render: () => {
+                    let component: any;
+                    let popup: any;
+
+                    return {
+                        onStart: (props: any) => {
+                            component = new ReactRenderer(CommandsList, {
+                                props,
+                                editor: props.editor,
+                            });
+
+                            if (!props.clientRect) {
+                                return;
+                            }
+
+                            popup = tippy('body', {
+                                getReferenceClientRect: props.clientRect,
+                                appendTo: () => document.body,
+                                content: component.element,
+                                showOnCreate: true,
+                                interactive: true,
+                                trigger: 'manual',
+                                placement: 'bottom-start',
+                            });
+                        },
+
+                        onUpdate(props: any) {
+                            component.updateProps(props);
+
+                            if (!props.clientRect) {
+                                return;
+                            }
+
+                            popup[0].setProps({
+                                getReferenceClientRect: props.clientRect,
+                            });
+                        },
+
+                        onKeyDown(props: any) {
+                            if (props.event.key === 'Escape') {
+                                popup[0].hide();
+                                return true;
+                            }
+                            return component.ref?.onKeyDown(props);
+                        },
+
+                        onExit() {
+                            popup[0].destroy();
+                            component.destroy();
+                        },
+                    };
+                },
+            },
+        }),
+    ], []); // 🛑 Truly static dependency array to prevent re-registration
 
     const editor = useEditor({
-        extensions: [
-            StarterKit,
-            Markdown,
-            Mathematics,
-            BubbleMenuExtension,
-            Placeholder.configure({
-                placeholder: "Type '/' for commands, or select text for AI tools...",
-            }),
-            Commands.configure({
-                suggestion: {
-                    items: createSuggestionItems(analysisStats, plotUrl),
-                    render: () => {
-                        let component: any;
-                        let popup: any;
-
-                        return {
-                            onStart: (props: any) => {
-                                component = new ReactRenderer(CommandsList, {
-                                    props,
-                                    editor: props.editor,
-                                });
-
-                                if (!props.clientRect) {
-                                    return;
-                                }
-
-                                popup = tippy('body', {
-                                    getReferenceClientRect: props.clientRect,
-                                    appendTo: () => document.body,
-                                    content: component.element,
-                                    showOnCreate: true,
-                                    interactive: true,
-                                    trigger: 'manual',
-                                    placement: 'bottom-start',
-                                });
-                            },
-
-                            onUpdate(props: any) {
-                                component.updateProps(props);
-
-                                if (!props.clientRect) {
-                                    return;
-                                }
-
-                                popup[0].setProps({
-                                    getReferenceClientRect: props.clientRect,
-                                });
-                            },
-
-                            onKeyDown(props: any) {
-                                if (props.event.key === 'Escape') {
-                                    popup[0].hide();
-                                    return true;
-                                }
-                                return component.ref?.onKeyDown(props);
-                            },
-
-                            onExit() {
-                                popup[0].destroy();
-                                component.destroy();
-                            },
-                        };
-                    },
-                },
-            }),
-        ],
+        extensions,
         content: generatedMarkdown,
         editorProps: {
             attributes: {
@@ -113,27 +292,19 @@ export default function ReportEditor() {
         onUpdate: ({ editor }) => {
             setGeneratedMarkdown((editor.storage as any).markdown.getMarkdown());
         },
+        onCreate: ({ editor }) => {
+            migrateMathStrings(editor);
+        },
     });
 
-    // Sync context to editor on mount if empty
+    // Sync context to editor when generatedMarkdown changes
     useEffect(() => {
-        if (editor && generatedMarkdown && editor.isEmpty) {
+        if (editor && generatedMarkdown && (editor.storage as any).markdown.getMarkdown() !== generatedMarkdown) {
             editor.commands.setContent(generatedMarkdown);
+            migrateMathStrings(editor); // 🚀 Ensure AI-generated math is migrated
         }
     }, [editor, generatedMarkdown]);
 
-    const handlePrint = () => {
-        window.print();
-    };
-
-    const handleDownloadMD = () => {
-        const blob = new Blob([generatedMarkdown], { type: 'text/markdown' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'physics_report.md';
-        a.click();
-    };
 
     if (!editor) return null;
 
@@ -170,24 +341,28 @@ export default function ReportEditor() {
                         </div>
                     </div>
 
-                    {/* Tiptap Editor or Loading State */}
-                    {(!generatedMarkdown && isGeneratingReport) ? (
-                        <div className="flex flex-col items-center justify-center py-40 gap-6 animate-in fade-in duration-1000">
-                            <div className="relative">
-                                <Beaker className="w-16 h-16 text-emerald-600/20" />
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+                    {/* Report Content */}
+                    <div className="relative">
+                        <Toolbar editor={editor} />
+
+                        {(!generatedMarkdown && isGeneratingReport) ? (
+                            <div className="flex flex-col items-center justify-center py-40 gap-6 animate-in fade-in duration-1000">
+                                <div className="relative">
+                                    <Beaker className="w-16 h-16 text-emerald-600/20" />
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+                                    </div>
+                                    <Sparkles className="absolute -top-1 -right-1 w-6 h-6 text-emerald-400 animate-pulse" />
                                 </div>
-                                <Sparkles className="absolute -top-1 -right-1 w-6 h-6 text-emerald-400 animate-pulse" />
+                                <div className="text-center space-y-2">
+                                    <h3 className="font-bold text-slate-900">AI is writing the report...</h3>
+                                    <p className="text-sm text-slate-500">{generationProgress}</p>
+                                </div>
                             </div>
-                            <div className="text-center space-y-2">
-                                <h3 className="font-bold text-slate-900">AI is writing the report...</h3>
-                                <p className="text-sm text-slate-500">{generationProgress}</p>
-                            </div>
-                        </div>
-                    ) : (
-                        <EditorContent editor={editor} />
-                    )}
+                        ) : (
+                            <EditorContent editor={editor} className="min-h-[29.7cm]" />
+                        )}
+                    </div>
                 </div>
             </main>
 
@@ -224,29 +399,6 @@ export default function ReportEditor() {
                 </BubbleMenu>
             )}
 
-            {/* Floating Action Bar (FAB) */}
-            <div className="fixed bottom-10 right-10 flex flex-col items-end gap-3 no-print group z-50">
-                <div className="flex items-center gap-2 animate-in slide-in-from-right-10 opacity-0 group-hover:opacity-100 transition-all duration-300">
-                    <button
-                        onClick={handleDownloadMD}
-                        className="p-3 bg-white border border-slate-200 text-slate-600 rounded-2xl shadow-xl hover:bg-slate-50 transition-all flex items-center gap-2"
-                    >
-                        <Download size={20} />
-                        <span className="text-sm font-bold pr-2">Markdown</span>
-                    </button>
-                    <button
-                        onClick={handlePrint}
-                        className="p-3 bg-white border border-slate-200 text-slate-600 rounded-2xl shadow-xl hover:bg-slate-50 transition-all flex items-center gap-2"
-                    >
-                        <Printer size={20} />
-                        <span className="text-sm font-bold pr-2">Print PDF</span>
-                    </button>
-                </div>
-
-                <button className="w-16 h-16 bg-emerald-600 text-white rounded-3xl shadow-[0_10px_40px_-10px_rgba(16,185,129,0.5)] flex items-center justify-center hover:bg-emerald-700 hover:scale-110 transition-all active:scale-95 group/main">
-                    <FileDown size={28} className="group-hover/main:rotate-12 transition-transform" />
-                </button>
-            </div>
 
             {/* Zen Mode Toggle */}
             <div className="fixed bottom-10 left-10 no-print">
@@ -273,8 +425,23 @@ export default function ReportEditor() {
                 }
                 .prose h1 { text-align: center; border-bottom: 2px solid #1e293b; padding-bottom: 0.5rem; margin-top: 2rem; }
                 .prose h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.25rem; margin-top: 1.5rem; }
-                .prose table { border-collapse: collapse; width: 100%; border: 2px solid #e2e8f0; }
-                .prose th, .prose td { border: 1px solid #e2e8f0; padding: 0.5rem; }
+                .prose table { border-collapse: collapse; width: 100%; border: 2px solid #e2e8f0; margin-bottom: 1.5rem; }
+                .prose th, .prose td { border: 1px solid #e2e8f0; padding: 0.75rem; }
+                .prose th { background: #f8fafc; font-weight: 800; color: #475569; }
+                
+                /* Tiptap Table Selected Cell */
+                .prose .selectedCell:after { background: rgba(16, 185, 129, 0.1); }
+                .prose .column-resize-handle { background-color: #10b981; }
+
+                /* Mathematics Styling */
+                .Mathematics-node { 
+                    font-size: 1.1em;
+                    padding: 0 4px;
+                    border-radius: 4px;
+                    transition: background 0.2s;
+                }
+                .Mathematics-node:hover { background: #f1f5f9; }
+                .katex-display { margin: 1em 0; overflow-x: auto; overflow-y: hidden; }
             `}</style>
         </div>
     );

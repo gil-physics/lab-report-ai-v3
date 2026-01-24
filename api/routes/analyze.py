@@ -13,7 +13,7 @@ from api.utils.physics_formulas import get_recommended_formulas
 from api.utils.outlier_detection import remove_outliers
 from api.services.ai_service import generate_ai_content
 from api.services.template_service import load_report_template
-from api.services.plot_service import generate_plot_base64, generate_residual_plot_base64, generate_plot_file
+from api.services.plot_service import generate_plot_base64, generate_residual_plot_base64, generate_plot_file, generate_residual_plot_file
 import uuid
 
 router = APIRouter()
@@ -107,7 +107,8 @@ async def analyze(request: Request):
                 "params": [float(p) for p in best_model["params"]],
                 "standard_errors": [float(se) for se in best_model.get("standard_errors", [])],
                 "equation": best_model["equation"],
-                "latex": latex_equation
+                "latex": latex_equation,
+                "trendline": best_model.get("trendline", [])
             },
             "residuals": residuals,
             "recommended_formulas": recommended_formulas[:5],
@@ -130,6 +131,8 @@ async def prepare_report_md(request: Request):
         items = body.get('items', [])
         use_ai = body.get('use_ai', False)
         
+        print(f"DEBUG: prepare_report_md called with {len(items)} items, use_ai={use_ai}")
+        
         if not items:
             return JSONResponse(status_code=400, content={"status": "error", "message": "No analysis items provided"})
 
@@ -148,30 +151,53 @@ async def prepare_report_md(request: Request):
             md_content.append(theory_part.strip())
             md_content.append("---")
 
+        # Determine base URL for static files (plots)
+        host = request.headers.get("host", "localhost:8000")
+        protocol = "https" if request.headers.get("x-forwarded-proto") == "https" else "http"
+        base_url = f"{protocol}://{host}"
+
         md_content.append("## 1. 실험 결과 및 분석")
         
         for idx, item in enumerate(items):
             exp_name = item.get('experiment_name', f'실험 {idx+1}')
-            analysis = item.get('analysis', {})
             data = item.get('data', {})
             x_label = item.get('x_label', 'X')
             y_label = item.get('y_label', 'Y')
             
-            # Regression Data for plotting
-            x_vals = np.array(data.get('x', []))
-            y_vals = np.array(data.get('y', []))
-            y_pred_vals = np.array(data.get('y_predicted', [])) if 'y_predicted' in data else None
-            residuals_vals = np.array(data.get('residuals', [])) if 'residuals' in data else None
+            # Regression Data (Raw)
+            x_vals = np.array(data.get('x', []), dtype=float)
+            y_vals = np.array(data.get('y', []), dtype=float)
+            
+            # Remove NaNs if any (prevent calculation failure)
+            mask = ~np.isnan(x_vals) & ~np.isnan(y_vals)
+            x_vals = x_vals[mask]
+            y_vals = y_vals[mask]
+
+            if len(x_vals) < 2:
+                continue
+
+            # 🛠️ ALWAYS use Python to recalculate analysis for the final report (Source of Truth)
+            # This ensures Step 3 is high-quality even if Step 2 was a fast frontend preview.
+            analysis = smart_curve_fitting(x_vals, y_vals)
+            if not analysis:
+                continue
+                
+            # LaTeX 수식 생성
+            latex_equation = equation_to_latex(analysis['equation'], analysis['params'])
+            
+            # Prediction for plotting
+            y_pred_vals = analysis['func'](x_vals, *analysis['params'])
+            residuals_vals = y_vals - y_pred_vals
             
             md_content.append(f"### 1.{idx+1}. {exp_name}")
             md_content.append("")  # Blank line before table
             
-            # Summary Table - combine all rows into one string
+            # Summary Table
             table_rows = [
                 "| 항목 | 내용 |",
                 "| :--- | :--- |",
-                f"| 최적 모델 | {analysis.get('model', 'N/A')} |",
-                f"| 회귀 수식 | ${analysis.get('latex', analysis.get('equation', 'N/A'))}$ |",
+                f"| 최적 모델 | {analysis.get('name', 'N/A')} |",
+                f"| 회귀 수식 | ${latex_equation}$ |",
                 f"| 결정계수 ($R^2$) | {analysis.get('r_squared', 0):.4f} |"
             ]
             
@@ -182,48 +208,55 @@ async def prepare_report_md(request: Request):
                 params_md = [f"{param_names[i] if i < 5 else f'p{i}'} = {v:.4f} (± {e:.4f})" for i, (v, e) in enumerate(zip(p_vals, p_errs))]
                 table_rows.append(f"| 추정 파라미터 | {', '.join(params_md)} |")
             
-            md_content.append("\n".join(table_rows))  # Join table rows with single newline
-            md_content.append("")  # Blank line after table
+            md_content.append("\n".join(table_rows))
+            md_content.append("")
             
-            # 🖼️ Generate Static Graph Files (URL)
-            if len(x_vals) > 0:
-                md_content.append("")  # Blank line before images
-                
-                # Generate unique filename
-                plot_filename = f"report_graph_{uuid.uuid4()}.png"
-                plots_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "plots")
-                if not os.path.exists(plots_dir):
-                    os.makedirs(plots_dir)
-                plot_path = os.path.join(plots_dir, plot_filename)
-                
-                # Generate and save plot
-                generate_plot_file(x_vals, y_vals, plot_path, y_pred_vals, x_label, y_label, f"{exp_name} 회귀 분석")
-                plot_url = f"http://localhost:8000/plots/{plot_filename}"
-                
-                md_content.append(f"![{exp_name} 회귀 분석 그래프]({plot_url})")
-                md_content.append("")  # Blank line after image
-                
-                # Capture the first plot URL to return for context usage
-                if 'first_plot_url' not in locals():
-                    first_plot_url = plot_url
-                
-                if residuals_vals is not None:
-                    # Residual plot
-                    res_filename = f"report_residual_{uuid.uuid4()}.png"
-                    res_path = os.path.join(plots_dir, res_filename)
-                    # We need a file version of residual plot too, let's adapt generate_residual_plot_base64 or create new one
-                    # For now, let's skip residual file conversion or assume similar logic. 
-                    # To avoid errors, I'll temporarily comment out residual plot or implement generate_residual_plot_file
-                    pass 
-                    # res_plot_b64 = generate_residual_plot_base64(x_vals, residuals_vals, x_label, y_label, f"{exp_name} 잔차 분석")
-                    # md_content.append(f"![{exp_name} 잔차 그래프]({res_plot_b64})")
-                    # md_content.append("")
+            # Extract settings from item if available (passed from Step 2)
+            # body.items structure: [{data, x_label, y_label, x_range, y_range, is_log_scale, ...}]
+            x_range = item.get('x_range')
+            y_range = item.get('y_range')
+            is_log = item.get('is_log_scale', False)
+
+            # 🖼️ Generate Static Graph Files using Matplotlib (Quality over Speed)
+            plot_filename = f"report_graph_{uuid.uuid4()}.png"
+            res_filename = f"report_residual_{uuid.uuid4()}.png"
+            
+            # Directory setup
+            plots_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "plots")
+            if not os.path.exists(plots_dir):
+                os.makedirs(plots_dir)
+            
+            # Save files
+            generate_plot_file(x_vals, y_vals, os.path.join(plots_dir, plot_filename), y_pred_vals, x_label, y_label, f"{exp_name} 회귀 분석", x_range=x_range, y_range=y_range, is_log=is_log)
+            generate_residual_plot_file(x_vals, residuals_vals, os.path.join(plots_dir, res_filename), x_label, y_label, f"{exp_name} 잔차 분석", x_range=x_range)
+            
+            # Markdown links
+            md_content.append(f"![{exp_name} 회귀 분석 그래프]({base_url}/plots/{plot_filename})")
+            md_content.append(f"![{exp_name} 잔차 그래프]({base_url}/plots/{res_filename})")
+            md_content.append("")
+            
+            # Capture the first plot URL to return for context usage (e.g., Slash Commands)
+            if 'first_plot_url' not in locals():
+                first_plot_url = f"{base_url}/plots/{plot_filename}"
             
             # AI Discussion
             if use_ai:
+                # 📊 원본 데이터 통계 계산 추가
+                raw_data_summary = None
+                if len(x_vals) > 0 and len(y_vals) > 0:
+                    raw_data_summary = {
+                        "count": int(len(x_vals)),
+                        "x_min": float(np.min(x_vals)),
+                        "x_max": float(np.max(x_vals)),
+                        "y_min": float(np.min(y_vals)),
+                        "y_max": float(np.max(y_vals)),
+                        "y_mean": float(np.mean(y_vals)),
+                        "y_std": float(np.std(y_vals))
+                    }
+
                 md_content.append("")  # Blank line before AI section
                 md_content.append(f"#### 📊 AI 실험 결과 분석 및 고찰 ({exp_name})")
-                ai_content = await generate_ai_content(exp_name, analysis, template, template_content)
+                ai_content = await generate_ai_content(exp_name, analysis, template, template_content, raw_data_summary)
                 md_content.append(ai_content)
                 md_content.append("")  # Blank line after AI section
 
@@ -237,12 +270,7 @@ async def prepare_report_md(request: Request):
                 md_content.append(footer_part.strip())
 
         final_markdown = "\n\n".join(md_content)
-        
-        # Debug: Print first 1000 chars to see table formatting
-        print("=" * 50)
-        print("DEBUG: Generated Markdown Preview:")
-        print(final_markdown[:1500])
-        print("=" * 50)
+        print(f"DEBUG: Report generated successfully. Total length: {len(final_markdown)} chars")
         
         return JSONResponse(content={
             "status": "success", 

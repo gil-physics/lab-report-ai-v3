@@ -1,15 +1,61 @@
-import { useCallback, useState } from 'react';
-import { useDropzone } from 'react-dropzone'; // Removed 'FileRejection', 'DropEvent' if not used
+import { useCallback, useState, useEffect } from 'react';
+import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, FileDown, AlertCircle, FileSpreadsheet, Database } from 'lucide-react'; // Added Database, removed CheckCircle2
+import {
+    Upload, AlertCircle, FileSpreadsheet, Database,
+    LayoutGrid, Plus, Trash2, ChevronRight,
+    Target, Flag, Play, Anchor, MousePointer2, Camera
+} from 'lucide-react';
 import Papa from 'papaparse';
 import { useAnalysis } from '../../context/AnalysisContext';
+import { analyzeTypeUniformity, detectParallelBlocks } from '../../lib/physicsKeywords';
+import { useNavigate } from 'react-router-dom';
+
+type SelectionMode = 'header' | 'data';
 
 const SmartDropzone: React.FC = () => {
-    const { setFile, setParsedData } = useAnalysis();
+    const navigate = useNavigate();
+    const {
+        setFile, setRawRows, rawRows, units, addUnit, removeUnit,
+        setActiveStep
+    } = useAnalysis();
+
     const [isProcessing, setIsProcessing] = useState(false);
     const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>('idle');
-    const [errorMessage, setErrorMessage] = useState('');
+
+    // --- Slicing State (Active Selection) ---
+    const [headerRow, setHeaderRow] = useState<number>(0);
+    const [dataStart, setDataStart] = useState<number>(1);
+    const [dataEnd, setDataEnd] = useState<number>(0);
+    const [colRange, setColRange] = useState<[number, number]>([0, 0]);
+    const [unitName, setUnitName] = useState('');
+    const [selectionMode, setSelectionMode] = useState<SelectionMode>('header');
+    const [suggestedBlocks, setSuggestedBlocks] = useState<number[][]>([]);
+
+    // --- Drag Interaction State ---
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragAnchor, setDragAnchor] = useState<number | null>(null);
+
+    // --- Initialization ---
+    useEffect(() => {
+        if (rawRows.length > 0) {
+            const { headerCandidate, dataStartCandidate } = analyzeTypeUniformity(rawRows);
+            const splits = detectParallelBlocks(rawRows, headerCandidate);
+
+            setHeaderRow(headerCandidate);
+            setDataStart(dataStartCandidate);
+            setDataEnd(rawRows.length - 1);
+            setSuggestedBlocks(splits);
+
+            if (splits.length > 0) {
+                setColRange(splits[0] as [number, number]);
+            } else {
+                setColRange([0, rawRows[0].length - 1]);
+            }
+
+            setUnitName(`실험 단위 ${units.length + 1}`);
+        }
+    }, [rawRows.length]);
 
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
         const file = acceptedFiles[0];
@@ -18,24 +64,18 @@ const SmartDropzone: React.FC = () => {
         setIsProcessing(true);
         setUploadStatus('idle');
 
-        // Simulate "Analysis" delay for effect
-        await new Promise(resolve => setTimeout(resolve, 800));
-
         try {
             const text = await file.text();
             Papa.parse(text, {
-                header: true,
+                header: false,
                 dynamicTyping: true,
-                skipEmptyLines: true,
+                skipEmptyLines: false,
                 complete: (results) => {
-                    const data = results.data as any[];
-                    if (data && data.length > 0) {
+                    const rows = results.data as any[][];
+                    if (rows && rows.length > 0) {
                         setFile(file);
-                        setParsedData(data);
+                        setRawRows(rows);
                         setUploadStatus('success');
-                        // No logic here to check validity deeply, just parsing
-
-                        // Play success sound logic could go here
                     } else {
                         throw new Error("데이터가 비어있거나 형식이 올바르지 않습니다.");
                     }
@@ -46,142 +86,402 @@ const SmartDropzone: React.FC = () => {
                 }
             });
         } catch (err: any) {
-            setErrorMessage(err.message || '파일 업로드 실패');
             setUploadStatus('error');
             setIsProcessing(false);
         }
-    }, [setFile, setParsedData]);
+    }, [setFile, setRawRows]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
-        accept: {
-            'text/csv': ['.csv'],
-            'application/vnd.ms-excel': ['.csv']
-        },
-        maxFiles: 1,
-        multiple: false
+        accept: { 'text/csv': ['.csv'], 'application/vnd.ms-excel': ['.csv'] },
+        maxFiles: 1, multiple: false, disabled: uploadStatus === 'success'
+    });
+
+    const handleAddUnit = () => {
+        // Extract data for this unit
+        const headerCells = rawRows[headerRow];
+        const dataRows = rawRows.slice(dataStart, dataEnd + 1);
+        const colSlice = headerCells.slice(colRange[0], colRange[1] + 1);
+
+        const unitColumns = colSlice.map((h, i) => String(h || `Column_${colRange[0] + i}`));
+        const unitData = dataRows.map(row => {
+            const rowSlice = row.slice(colRange[0], colRange[1] + 1);
+            const obj: any = {};
+            unitColumns.forEach((col, i) => {
+                obj[col] = rowSlice[i];
+            });
+            return obj;
+        });
+
+        addUnit({
+            name: unitName || `실험 단위 ${units.length + 1}`,
+            fileId: 'current-file',
+            headerRow,
+            dataStart,
+            dataEnd,
+            columnRange: colRange,
+            excludedColumns: [],
+            columns: unitColumns,
+            data: unitData,
+            charts: [], // Initialize with empty charts
+            derivedVariables: [],
+            activeChartId: null
+        });
+
+        setUnitName(`실험 단위 ${units.length + 2}`);
+    };
+
+    if (uploadStatus === 'success' && rawRows.length > 0) {
+        return (
+            <div className="fixed inset-0 bg-slate-50 flex flex-col z-[100] animate-in fade-in duration-500 overflow-hidden">
+                {/* 1. Global Header */}
+                <header className="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between shadow-sm z-20">
+                    <div className="flex items-center space-x-4">
+                        <div className="bg-blue-600 text-white p-2 rounded-xl">
+                            <FileSpreadsheet size={20} />
+                        </div>
+                        <h1 className="font-black text-slate-800 tracking-tight">지능형 실험단위 추출기</h1>
+                        <span className="text-slate-300">|</span>
+                        <div className="flex items-center space-x-2 text-sm font-bold text-slate-500">
+                            <span className="bg-slate-100 px-3 py-1 rounded-lg">Row Slicing</span>
+                            <ChevronRight size={14} />
+                            <span className="text-blue-600">Unit Definition</span>
+                        </div>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                        <button
+                            onClick={resetWorkspace}
+                            className="text-slate-400 hover:text-slate-600 transition-colors"
+                        >
+                            파일 다시 올리기
+                        </button>
+                        <button
+                            onClick={() => {
+                                if (units.length === 0) {
+                                    alert("분석할 실험 단위를 하나 이상 추가해주세요!");
+                                    return;
+                                }
+                                setActiveStep('analysis');
+                                navigate('/visualize');
+                            }}
+                            className={`btn-primary px-8 py-2.5 rounded-xl shadow-lg transition-all font-black flex items-center space-x-2 ${units.length === 0 ? 'opacity-50 grayscale cursor-not-allowed' : 'shadow-blue-500/20 active:scale-95'}`}
+                        >
+                            <span>{units.length}개 유닛 분석 시작</span>
+                            <Play size={16} fill="currentColor" />
+                        </button>
+                    </div>
+                </header>
+
+                <main className="flex-1 flex overflow-hidden">
+                    {/* 2. Left Side: Interactive Grid (Playground) */}
+                    <div className="flex-1 flex flex-col overflow-hidden bg-white border-r border-slate-200">
+                        <div className="p-4 bg-slate-50/50 border-b border-slate-200 flex flex-col space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-6">
+                                    <div className="flex items-center space-x-2">
+                                        <Target className="w-4 h-4 text-blue-500" />
+                                        <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Slicing Playground</span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-400 font-medium">헤더는 클릭해서, 데이터 범위는 드래그해서 선택하세요.</p>
+                                </div>
+                                <div className="flex bg-white rounded-xl border border-slate-200 p-1 shadow-sm">
+                                    <button
+                                        onClick={() => setSelectionMode('header')}
+                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all flex items-center space-x-1.5 ${selectionMode === 'header' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                                    >
+                                        <Database size={12} />
+                                        <span>SET HEADER</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setSelectionMode('data')}
+                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all flex items-center space-x-1.5 ${selectionMode === 'data' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                                    >
+                                        <MousePointer2 size={12} />
+                                        <span>DRAG DATA</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {suggestedBlocks.length > 1 && (
+                                <div className="flex items-center space-x-3 py-2 border-t border-slate-100">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Suggested Splits:</span>
+                                    <div className="flex items-center space-x-2">
+                                        {suggestedBlocks.map((block, idx) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => setColRange(block as [number, number])}
+                                                className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all ${colRange[0] === block[0] && colRange[1] === block[1] ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-200 text-slate-500 hover:border-blue-200'}`}
+                                            >
+                                                Trial {idx + 1} (Col {block[0] + 1}~{block[1] + 1})
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex-1 overflow-auto custom-scrollbar relative">
+                            <table className="w-full border-separate border-spacing-0">
+                                <thead className="sticky top-0 z-10 bg-white">
+                                    <tr>
+                                        <th className="p-2 border-b border-r border-slate-200 w-12 text-[10px] font-black text-slate-400 uppercase bg-slate-50">#</th>
+                                        {rawRows[0].map((_, i) => (
+                                            <th key={i} className={`p-3 border-b border-r border-slate-200 text-left text-[10px] font-black text-slate-400 uppercase bg-slate-50 ${i >= colRange[0] && i <= colRange[1] ? 'bg-blue-50/50' : ''}`}>
+                                                Col {i + 1}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rawRows.map((row, idx) => {
+                                        const isHeader = idx === headerRow;
+                                        const isStart = idx === dataStart;
+                                        const isEnd = idx === dataEnd;
+                                        const isData = idx >= dataStart && idx <= dataEnd;
+
+                                        const handleMouseDown = () => {
+                                            if (selectionMode === 'header') {
+                                                setHeaderRow(idx);
+                                            } else if (selectionMode === 'data') {
+                                                setIsDragging(true);
+                                                setDragAnchor(idx);
+                                                setDataStart(idx);
+                                                setDataEnd(idx);
+                                            }
+                                        };
+
+                                        const handleMouseEnter = () => {
+                                            if (isDragging && dragAnchor !== null) {
+                                                const start = Math.min(dragAnchor, idx);
+                                                const end = Math.max(dragAnchor, idx);
+                                                setDataStart(start);
+                                                setDataEnd(end);
+                                            }
+                                        };
+
+                                        const handleMouseUp = () => {
+                                            if (isDragging) {
+                                                setIsDragging(false);
+                                                setDragAnchor(null);
+                                            }
+                                        };
+
+                                        return (
+                                            <tr
+                                                key={idx}
+                                                onMouseDown={handleMouseDown}
+                                                onMouseEnter={handleMouseEnter}
+                                                onMouseUp={handleMouseUp}
+                                                className={`group transition-all select-none cursor-pointer relative ${isHeader ? 'bg-blue-600 text-white shadow-xl z-20' : isData ? 'bg-emerald-50/50' : 'hover:bg-slate-50'}`}
+                                            >
+                                                <td className={`p-2 border-b border-r border-slate-100 text-center text-[10px] font-bold ${isHeader ? 'text-white' : 'text-slate-300'} relative w-12`}>
+                                                    <span className={isHeader || isStart || isEnd ? 'opacity-0' : 'opacity-100'}>{idx + 1}</span>
+                                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                        {isHeader && <Database size={12} className="text-white" />}
+                                                        {isStart && <Flag size={12} className="text-emerald-600" />}
+                                                        {isEnd && <Anchor size={12} className="text-red-600" />}
+                                                    </div>
+                                                </td>
+                                                {row.map((cell, cIdx) => (
+                                                    <td
+                                                        key={cIdx}
+                                                        className={`p-3 border-b border-r border-slate-100 truncate max-w-[200px] text-xs font-mono transition-all ${cIdx < colRange[0] || cIdx > colRange[1] ? 'opacity-20 grayscale scale-[0.98]' : ''} ${isHeader ? 'font-black border-blue-500' : isData ? 'text-slate-700' : 'text-slate-400'}`}
+                                                    >
+                                                        {cell === null || cell === undefined || String(cell).trim() === "" ? (
+                                                            <span className="text-[10px] text-slate-300 font-black opacity-40">X</span>
+                                                        ) : (
+                                                            String(cell)
+                                                        )}
+                                                    </td>
+                                                ))}
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* 3. Right Side: Analysis Queue Sidebar */}
+                    <div className="w-80 bg-white flex flex-col shadow-[-4px_0_15px_rgba(0,0,0,0.02)] z-10">
+                        <div className="p-6 border-b border-slate-100">
+                            <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center">
+                                <LayoutGrid size={16} className="mr-2 text-blue-500" />
+                                Analysis Units ({units.length})
+                            </h2>
+                        </div>
+
+                        {/* Current Unit Config */}
+                        <div className="p-6 space-y-4 bg-slate-50/50">
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">New Unit Name</label>
+                                <input
+                                    type="text"
+                                    value={unitName}
+                                    onChange={(e) => setUnitName(e.target.value)}
+                                    placeholder="단위 이름 (예: 실험 A)"
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                />
+                            </div>
+                            <button
+                                onClick={handleAddUnit}
+                                className="w-full bg-slate-800 hover:bg-black text-white py-3 rounded-xl font-black text-xs shadow-lg shadow-slate-200 active:scale-95 transition-all flex items-center justify-center space-x-2"
+                            >
+                                <Plus size={16} />
+                                <span>분석 대상으로 추가</span>
+                            </button>
+                        </div>
+
+                        {/* Queue List */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                            <AnimatePresence initial={false}>
+                                {units.map((unit) => (
+                                    <motion.div
+                                        key={unit.id}
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, scale: 0.9 }}
+                                        className="group bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:shadow-md transition-all hover:border-blue-200"
+                                    >
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-xs font-black text-slate-800 truncate pr-2">{unit.name}</span>
+                                            <button
+                                                onClick={() => removeUnit(unit.id)}
+                                                className="text-slate-300 hover:text-red-500 transition-colors p-1"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                                <div className="h-full bg-blue-500 w-full" />
+                                            </div>
+                                            <span className="text-[9px] font-bold text-slate-400">{unit.data.length} pts</span>
+                                        </div>
+                                        <div className="mt-3 grid grid-cols-2 gap-2">
+                                            <div className="bg-slate-50 rounded-lg p-1.5 text-center">
+                                                <div className="text-[8px] font-black text-slate-400 uppercase">Rows</div>
+                                                <div className="text-[10px] font-mono font-bold text-slate-700">{unit.headerRow + 1} ~ {unit.dataEnd + 1}</div>
+                                            </div>
+                                            <div className="bg-slate-50 rounded-lg p-1.5 text-center">
+                                                <div className="text-[8px] font-black text-slate-400 uppercase">Cols</div>
+                                                <div className="text-[10px] font-mono font-bold text-slate-700">{unit.columnRange[0] + 1} ~ {unit.columnRange[1] + 1}</div>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+
+                            {units.length === 0 && (
+                                <div className="h-40 flex flex-col items-center justify-center text-center p-6 bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-200">
+                                    <AlertCircle className="w-8 h-8 text-slate-300 mb-3" />
+                                    <p className="text-[11px] font-bold text-slate-400 leading-relaxed uppercase tracking-tighter">추가된 실험 단위가 없습니다.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </main>
+            </div>
+        );
+    }
+
+    const onImageDrop = useCallback(async (acceptedFiles: File[]) => {
+        const file = acceptedFiles[0];
+        if (!file) return;
+        // OCR Logic will go here
+        alert("OCR 기능은 현재 준비 중입니다! 이미지가 정상적으로 감지되었습니다.");
+    }, []);
+
+    const { getRootProps: getImageProps, getInputProps: getImageInputProps, isDragActive: isImageActive } = useDropzone({
+        onDrop: onImageDrop,
+        accept: { 'image/*': ['.jpg', '.jpeg', '.png'] },
+        maxFiles: 1, multiple: false
     });
 
     return (
-        <div className="w-full max-w-2xl mx-auto">
-            <div {...getRootProps()} className="outline-none">
-                <input {...getInputProps()} />
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.99 }}
-                    className={`
-                        relative overflow-hidden rounded-3xl border-3 border-dashed cursor-pointer
-                        flex flex-col items-center justify-center p-12 text-center
-                        transition-all duration-300
-                        ${isDragActive
-                            ? 'border-blue-500 bg-blue-50/80 scale-105 shadow-2xl shadow-blue-500/10'
-                            : uploadStatus === 'error'
-                                ? 'border-red-300 bg-red-50/50 hover:border-red-400'
-                                : 'border-slate-200 bg-white/60 hover:border-blue-400 hover:bg-white hover:shadow-xl hover:shadow-blue-500/5'
-                        }
-                    `}
-                >
-
-                    <AnimatePresence mode='wait'>
-                        {isProcessing ? (
-                            <motion.div
-                                key="processing"
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.8 }}
-                                className="flex flex-col items-center"
-                            >
-                                <div className="relative w-24 h-24 mb-6">
-                                    <motion.div
-                                        className="absolute inset-0 border-4 border-slate-100 rounded-full"
-                                    />
-                                    <motion.div
-                                        className="absolute inset-0 border-4 border-blue-500 rounded-full border-t-transparent"
-                                        animate={{ rotate: 360 }}
-                                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                    />
-                                    <div className="absolute inset-0 flex items-center justify-center text-blue-600">
-                                        <FileDown className="w-8 h-8 animate-bounce" />
-                                    </div>
-                                </div>
-                                <h3 className="text-xl font-bold text-slate-800">데이터 구조 분석 중...</h3>
-                                <p className="text-slate-500 mt-2">CSV 파일의 무결성을 확인하고 있습니다.</p>
-                            </motion.div>
-                        ) : uploadStatus === 'error' ? (
-                            <motion.div
-                                key="error"
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                className="flex flex-col items-center text-red-500"
-                            >
-                                <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-4">
-                                    <AlertCircle className="w-10 h-10" />
-                                </div>
-                                <h3 className="text-xl font-bold text-red-600 mb-1">업로드 실패</h3>
-                                <p className="text-red-400 mb-6">{errorMessage}</p>
-                                <button className="px-6 py-2 bg-white border border-red-200 rounded-lg text-sm font-medium text-red-600 shadow-sm hover:bg-red-50 transition-colors">
-                                    다시 시도하기
-                                </button>
-                            </motion.div>
-                        ) : (
-                            <motion.div
-                                key="idle"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                className="relative z-10"
-                            >
-                                <div className={`
-                                w-24 h-24 rounded-[2rem] mx-auto mb-8 flex items-center justify-center shadow-lg transition-colors duration-300
-                                ${isDragActive ? 'bg-blue-500 text-white rotate-12 scale-110' : 'bg-white text-blue-600'}
-                            `}>
-                                    <Upload className={`w-10 h-10 ${isDragActive ? 'animate-pulse' : ''}`} strokeWidth={2.5} />
-                                </div>
-
-                                <h3 className="text-2xl font-bold text-slate-800 mb-3">
-                                    {isDragActive ? "여기에 파일을 놓으세요!" : "실험 데이터 업로드"}
-                                </h3>
-                                <p className="text-slate-500 text-lg mb-8 max-w-sm mx-auto leading-relaxed">
-                                    CSV 파일을 이곳에 드래그하거나<br />
-                                    <span className="text-blue-600 font-bold decoration-2 underline-offset-4 hover:underline">클릭하여 선택</span>하세요.
-                                </p>
-
-                                <div className="flex items-center justify-center gap-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                                    <span className="flex items-center bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-                                        <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" />
-                                        .CSV Only
-                                    </span>
-                                    <span className="flex items-center bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-                                        <Database className="w-3.5 h-3.5 mr-1.5" />
-                                        UTF-8 Encoding
-                                    </span>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-
-                    {/* Background Decor */}
-                    {!isDragActive && !isProcessing && (
-                        <>
-                            <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:20px_20px] opacity-[0.2] pointer-events-none" />
-                            <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-blue-400/10 rounded-full blur-3xl pointer-events-none" />
-                            <div className="absolute -top-20 -left-20 w-64 h-64 bg-purple-400/10 rounded-full blur-3xl pointer-events-none" />
-                        </>
-                    )}
-                </motion.div>
+        <div className="w-full max-w-5xl mx-auto py-12 flex flex-col items-center">
+            <div className="text-center mb-10">
+                <h2 className="text-3xl font-black text-slate-800 mb-2">데이터 가져오기</h2>
+                <p className="text-slate-500 font-medium">컴퓨터에 저장된 파일이나 종이 실험지를 업로드하세요.</p>
             </div>
 
-            {/* Empty state nav bar (Back button disabled) */}
-            <div className="mt-12">
-                {/* NavigationControls will handle its own sticky/static logic */}
-                {/* Wait, if SmartDropzone is centered, sticky footer might look weird if content is short. 
-                     But the user said "Step 1" is floating. Correcting the parent container is better.
-                 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
+                {/* CSV Upload */}
+                <div {...getRootProps()} className="outline-none h-full">
+                    <input {...getInputProps()} />
+                    <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        whileHover={{ scale: 1.02, y: -5 }}
+                        className={`
+                            h-full relative overflow-hidden rounded-[2.5rem] border-3 border-dashed cursor-pointer
+                            flex flex-col items-center justify-center p-12 text-center
+                            transition-all duration-500 shadow-2xl shadow-transparent hover:shadow-blue-500/10
+                            ${isDragActive ? 'border-blue-500 bg-blue-50/50' : 'border-slate-200 bg-white hover:border-blue-300'}
+                        `}
+                    >
+                        <AnimatePresence mode='wait'>
+                            {isProcessing ? (
+                                <motion.div key="p" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center">
+                                    <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-6" />
+                                    <h3 className="text-xl font-black text-slate-800">CSV 패턴 분석 중...</h3>
+                                </motion.div>
+                            ) : (
+                                <motion.div key="i" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                                    <div className="w-16 h-16 bg-blue-600 text-white rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-xl shadow-blue-500/30">
+                                        <Upload strokeWidth={3} size={28} />
+                                    </div>
+                                    <h3 className="text-xl font-black text-slate-800 mb-2">CSV 파일 업로드</h3>
+                                    <p className="text-sm text-slate-400 font-medium mb-8">MBL, 엑셀 등 데이터 파일 기반</p>
+                                    <div className="flex justify-center gap-2">
+                                        <span className="px-2 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-400 uppercase tracking-tight">Smart Split</span>
+                                        <span className="px-2 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-400 uppercase tracking-tight">CSV Parsing</span>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </motion.div>
+                </div>
+
+                {/* OCR Image Upload */}
+                <div {...getImageProps()} className="outline-none h-full">
+                    <input {...getImageInputProps()} />
+                    <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        whileHover={{ scale: 1.02, y: -5 }}
+                        className={`
+                            h-full relative overflow-hidden rounded-[2.5rem] border-3 border-dashed cursor-pointer
+                            flex flex-col items-center justify-center p-12 text-center
+                            transition-all duration-500 shadow-2xl shadow-transparent hover:shadow-emerald-500/10
+                            ${isImageActive ? 'border-emerald-500 bg-emerald-50/50' : 'border-slate-200 bg-white hover:border-emerald-300'}
+                        `}
+                    >
+                        <motion.div key="i" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                            <div className="w-16 h-16 bg-slate-200 text-slate-400 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-xl">
+                                <Camera strokeWidth={3} size={28} />
+                            </div>
+                            <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 mb-4 tracking-tight uppercase">Coming Soon</div>
+                            <h3 className="text-xl font-black text-slate-400 mb-2">실험 사진 업로드 (OCR)</h3>
+                            <p className="text-sm text-slate-300 font-medium mb-8 opacity-60">종이에 적힌 수동 측정 데이터 기반</p>
+                            <div className="flex justify-center gap-2">
+                                <span className="px-2 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-400 uppercase tracking-tight">Vision AI</span>
+                                <span className="px-2 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-400 uppercase tracking-tight">Auto CSV</span>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                </div>
             </div>
         </div>
     );
+
+    function resetWorkspace() {
+        setUploadStatus('idle');
+        setFile(null);
+        setRawRows([]);
+    }
 };
 
 export default SmartDropzone;
+
+
