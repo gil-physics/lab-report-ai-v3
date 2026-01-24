@@ -3,6 +3,7 @@ import type { AnalysisResult, SavedAnalysis, AnalysisUnit, AnalysisChart, Backen
 import { calculateRegression, type RegressionStats } from '../lib/analysisUtils';
 import { suggestColumns } from '../lib/physicsKeywords';
 import { v4 as uuidv4 } from 'uuid';
+import { getApiUrl } from '../lib/api';
 
 type Step = 'upload' | 'analysis' | 'report';
 
@@ -214,7 +215,7 @@ export const AnalysisProvider: React.FC<{ children: ReactNode }> = ({ children }
                 const xData = enrichedData.map(d => d[activeChart.xColumn]);
                 const yData = enrichedData.map(d => d[activeChart.yColumn]);
 
-                const response = await fetch('http://localhost:8000/api/analyze', {
+                const response = await fetch(getApiUrl('/api/analyze'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

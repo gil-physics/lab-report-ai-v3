@@ -4,6 +4,7 @@ import { X, ChevronRight, FileText, Beaker, Sparkles, ArrowLeft } from 'lucide-r
 import { useNavigate } from 'react-router-dom';
 import { useAnalysis } from '../../context/AnalysisContext';
 import axios from 'axios';
+import { getApiUrl } from '../../lib/api';
 
 const CATEGORIES = [
     { id: 'general', name: '기본 템플릿', icon: FileText, description: '가장 표준적인 물리 실험 보고서 양식' },
@@ -126,7 +127,7 @@ export default function TemplateSelectorModal({ isOpen, onOpenChange }: Template
             }
 
             setGenerationProgress('AI is creating the report draft...');
-            const response = await axios.post('http://localhost:8000/api/prepare-report-md', {
+            const response = await axios.post(getApiUrl('/api/prepare-report-md'), {
                 template: templateId,
                 items: items,
                 use_ai: true

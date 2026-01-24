@@ -89,12 +89,12 @@ async def analyze(request: Request):
             os.makedirs(plots_dir)
             
         plot_path = os.path.join(plots_dir, plot_filename)
-        # Assuming first 2 cols are X and Y if multiple, but here we used x_data, y_data
-        # Need labels. Default to X, Y if not provided in request (request body structure: data: {x:..., y:...}, options:...)
-        # Actually x_label/y_label are not in options usually, but we can default.
-        generate_plot_file(x_data, y_data, plot_path, y_pred, "X Axis", "Y Axis", "Physics Experiment", None, None)
+        # Determine base URL for static files (plots)
+        host = request.headers.get("host", "localhost:8000")
+        protocol = "https" if request.headers.get("x-forwarded-proto") == "https" else "http"
+        base_url = f"{protocol}://{host}"
         
-        plot_url = f"http://localhost:8000/plots/{plot_filename}"
+        plot_url = f"{base_url}/plots/{plot_filename}"
         
         return JSONResponse(content={
             "status": "success",
