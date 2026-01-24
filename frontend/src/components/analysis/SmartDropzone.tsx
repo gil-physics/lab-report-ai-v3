@@ -97,6 +97,19 @@ const SmartDropzone: React.FC = () => {
         maxFiles: 1, multiple: false, disabled: uploadStatus === 'success'
     });
 
+    const onImageDrop = useCallback(async (acceptedFiles: File[]) => {
+        const file = acceptedFiles[0];
+        if (!file) return;
+        // OCR Logic will go here
+        alert("OCR 기능은 현재 준비 중입니다! 이미지가 정상적으로 감지되었습니다.");
+    }, []);
+
+    const { getRootProps: getImageProps, getInputProps: getImageInputProps, isDragActive: isImageActive } = useDropzone({
+        onDrop: onImageDrop,
+        accept: { 'image/*': ['.jpg', '.jpeg', '.png'] },
+        maxFiles: 1, multiple: false
+    });
+
     const handleAddUnit = () => {
         // Extract data for this unit
         const headerCells = rawRows[headerRow];
@@ -130,25 +143,6 @@ const SmartDropzone: React.FC = () => {
 
         setUnitName(`실험 단위 ${units.length + 2}`);
     };
-
-    const resetWorkspace = () => {
-        setUploadStatus('idle');
-        setFile(null);
-        setRawRows([]);
-    };
-
-    const onImageDrop = useCallback(async (acceptedFiles: File[]) => {
-        const file = acceptedFiles[0];
-        if (!file) return;
-        // OCR Logic will go here
-        alert("OCR 기능은 현재 준비 중입니다! 이미지가 정상적으로 감지되었습니다.");
-    }, []);
-
-    const { getRootProps: getImageProps, getInputProps: getImageInputProps, isDragActive: isImageActive } = useDropzone({
-        onDrop: onImageDrop,
-        accept: { 'image/*': ['.jpg', '.jpeg', '.png'] },
-        maxFiles: 1, multiple: false
-    });
 
     if (uploadStatus === 'success' && rawRows.length > 0) {
         return (
@@ -404,6 +398,7 @@ const SmartDropzone: React.FC = () => {
         );
     }
 
+
     return (
         <div className="w-full max-w-5xl mx-auto py-12 flex flex-col items-center">
             <div className="text-center mb-10">
@@ -480,6 +475,12 @@ const SmartDropzone: React.FC = () => {
             </div>
         </div>
     );
+
+    function resetWorkspace() {
+        setUploadStatus('idle');
+        setFile(null);
+        setRawRows([]);
+    }
 };
 
 export default SmartDropzone;
