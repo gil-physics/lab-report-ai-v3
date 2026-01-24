@@ -131,6 +131,25 @@ const SmartDropzone: React.FC = () => {
         setUnitName(`실험 단위 ${units.length + 2}`);
     };
 
+    const resetWorkspace = () => {
+        setUploadStatus('idle');
+        setFile(null);
+        setRawRows([]);
+    };
+
+    const onImageDrop = useCallback(async (acceptedFiles: File[]) => {
+        const file = acceptedFiles[0];
+        if (!file) return;
+        // OCR Logic will go here
+        alert("OCR 기능은 현재 준비 중입니다! 이미지가 정상적으로 감지되었습니다.");
+    }, []);
+
+    const { getRootProps: getImageProps, getInputProps: getImageInputProps, isDragActive: isImageActive } = useDropzone({
+        onDrop: onImageDrop,
+        accept: { 'image/*': ['.jpg', '.jpeg', '.png'] },
+        maxFiles: 1, multiple: false
+    });
+
     if (uploadStatus === 'success' && rawRows.length > 0) {
         return (
             <div className="fixed inset-0 bg-slate-50 flex flex-col z-[100] animate-in fade-in duration-500 overflow-hidden">
@@ -385,101 +404,8 @@ const SmartDropzone: React.FC = () => {
         );
     }
 
-    const onImageDrop = useCallback(async (acceptedFiles: File[]) => {
-        const file = acceptedFiles[0];
-        if (!file) return;
-        // OCR Logic will go here
-        alert("OCR 기능은 현재 준비 중입니다! 이미지가 정상적으로 감지되었습니다.");
-    }, []);
-
-    const { getRootProps: getImageProps, getInputProps: getImageInputProps, isDragActive: isImageActive } = useDropzone({
-        onDrop: onImageDrop,
-        accept: { 'image/*': ['.jpg', '.jpeg', '.png'] },
-        maxFiles: 1, multiple: false
-    });
-
-    return (
-        <div className="w-full max-w-5xl mx-auto py-12 flex flex-col items-center">
-            <div className="text-center mb-10">
-                <h2 className="text-3xl font-black text-slate-800 mb-2">데이터 가져오기</h2>
-                <p className="text-slate-500 font-medium">컴퓨터에 저장된 파일이나 종이 실험지를 업로드하세요.</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
-                {/* CSV Upload */}
-                <div {...getRootProps()} className="outline-none h-full">
-                    <input {...getInputProps()} />
-                    <motion.div
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        whileHover={{ scale: 1.02, y: -5 }}
-                        className={`
-                            h-full relative overflow-hidden rounded-[2.5rem] border-3 border-dashed cursor-pointer
-                            flex flex-col items-center justify-center p-12 text-center
-                            transition-all duration-500 shadow-2xl shadow-transparent hover:shadow-blue-500/10
-                            ${isDragActive ? 'border-blue-500 bg-blue-50/50' : 'border-slate-200 bg-white hover:border-blue-300'}
-                        `}
-                    >
-                        <AnimatePresence mode='wait'>
-                            {isProcessing ? (
-                                <motion.div key="p" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center">
-                                    <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-6" />
-                                    <h3 className="text-xl font-black text-slate-800">CSV 패턴 분석 중...</h3>
-                                </motion.div>
-                            ) : (
-                                <motion.div key="i" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                                    <div className="w-16 h-16 bg-blue-600 text-white rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-xl shadow-blue-500/30">
-                                        <Upload strokeWidth={3} size={28} />
-                                    </div>
-                                    <h3 className="text-xl font-black text-slate-800 mb-2">CSV 파일 업로드</h3>
-                                    <p className="text-sm text-slate-400 font-medium mb-8">MBL, 엑셀 등 데이터 파일 기반</p>
-                                    <div className="flex justify-center gap-2">
-                                        <span className="px-2 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-400 uppercase tracking-tight">Smart Split</span>
-                                        <span className="px-2 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-400 uppercase tracking-tight">CSV Parsing</span>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </motion.div>
-                </div>
-
-                {/* OCR Image Upload */}
-                <div {...getImageProps()} className="outline-none h-full">
-                    <input {...getImageInputProps()} />
-                    <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        whileHover={{ scale: 1.02, y: -5 }}
-                        className={`
-                            h-full relative overflow-hidden rounded-[2.5rem] border-3 border-dashed cursor-pointer
-                            flex flex-col items-center justify-center p-12 text-center
-                            transition-all duration-500 shadow-2xl shadow-transparent hover:shadow-emerald-500/10
-                            ${isImageActive ? 'border-emerald-500 bg-emerald-50/50' : 'border-slate-200 bg-white hover:border-emerald-300'}
-                        `}
-                    >
-                        <motion.div key="i" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                            <div className="w-16 h-16 bg-slate-200 text-slate-400 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-xl">
-                                <Camera strokeWidth={3} size={28} />
-                            </div>
-                            <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 mb-4 tracking-tight uppercase">Coming Soon</div>
-                            <h3 className="text-xl font-black text-slate-400 mb-2">실험 사진 업로드 (OCR)</h3>
-                            <p className="text-sm text-slate-300 font-medium mb-8 opacity-60">종이에 적힌 수동 측정 데이터 기반</p>
-                            <div className="flex justify-center gap-2">
-                                <span className="px-2 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-400 uppercase tracking-tight">Vision AI</span>
-                                <span className="px-2 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-400 uppercase tracking-tight">Auto CSV</span>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                </div>
-            </div>
-        </div>
+        </div >
     );
-
-    function resetWorkspace() {
-        setUploadStatus('idle');
-        setFile(null);
-        setRawRows([]);
-    }
 };
 
 export default SmartDropzone;
