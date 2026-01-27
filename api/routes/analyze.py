@@ -37,12 +37,32 @@ async def analyze(request: Request):
         
         x_data = np.array(data.get("x", []))
         y_data = np.array(data.get("y", []))
+        raw_x = data.get("raw_x", [])
+        raw_y = data.get("raw_y", [])
+        x_unit = data.get("x_unit", "")
+        y_unit = data.get("y_unit", "")
         
         if len(x_data) == 0 or len(y_data) == 0:
             return JSONResponse(status_code=400, content={"status": "error", "message": "Data cannot be empty"})
         
         if len(x_data) != len(y_data):
             return JSONResponse(status_code=400, content={"status": "error", "message": "X and Y data must have the same length"})
+        
+        # 유효숫자 계산 (Least Precise Rule)
+        from api.utils.significant_figures import count_sig_figs, format_with_uncertainty
+        
+        min_sig_figs = 10  # Default large number
+        for val_list in [raw_x, raw_y]:
+            for v in val_list:
+                if v:
+                    try:
+                        count = count_sig_figs(str(v))
+                        if count > 0:
+                            min_sig_figs = min(min_sig_figs, count)
+                    except:
+                        pass
+        
+        if min_sig_figs == 10: min_sig_figs = 3 # Fallback
         
         original_count = len(x_data)
         outliers_removed = 0
@@ -108,7 +128,10 @@ async def analyze(request: Request):
                 "standard_errors": [float(se) for se in best_model.get("standard_errors", [])],
                 "equation": best_model["equation"],
                 "latex": latex_equation,
-                "trendline": best_model.get("trendline", [])
+                "trendline": best_model.get("trendline", []),
+                "min_sig_figs": min_sig_figs,
+                "x_unit": x_unit,
+                "y_unit": y_unit
             },
             "residuals": residuals,
             "recommended_formulas": recommended_formulas[:5],
@@ -142,15 +165,8 @@ async def prepare_report_md(request: Request):
         
         template_content = load_report_template(template)
         
-        # Theory Section
-        if template_content:
-            theory_part = template_content
-            if "토의 및 결론" in template_content: theory_part = template_content.split("토의 및 결론", 1)[0]
-            elif "## 결론" in template_content: theory_part = template_content.split("## 결론", 1)[0]
-            if "1. 실험결과분석" in theory_part: theory_part = theory_part.split("1. 실험결과분석")[0]
-            md_content.append(theory_part.strip())
-            md_content.append("---")
-
+        template_content = load_report_template(template)
+        
         # Determine base URL for static files (plots)
         host = request.headers.get("host", "localhost:8000")
         protocol = "https" if request.headers.get("x-forwarded-proto") == "https" else "http"
@@ -163,6 +179,10 @@ async def prepare_report_md(request: Request):
             data = item.get('data', {})
             x_label = item.get('x_label', 'X')
             y_label = item.get('y_label', 'Y')
+            x_unit = item.get('x_unit', '')
+            y_unit = item.get('y_unit', '')
+            raw_x = item.get('raw_x', [])
+            raw_y = item.get('raw_y', [])
             
             # Regression Data (Raw)
             x_vals = np.array(data.get('x', []), dtype=float)
@@ -181,6 +201,25 @@ async def prepare_report_md(request: Request):
             analysis = smart_curve_fitting(x_vals, y_vals)
             if not analysis:
                 continue
+            
+            # 유효숫자 및 오차 전파 (Least Precise Rule)
+            from api.utils.significant_figures import count_sig_figs, format_with_uncertainty, format_value_sigfigs
+            
+            min_sig_figs = 10
+            for val_list in [raw_x, raw_y]:
+                for v in val_list:
+                    if v:
+                        try:
+                            count = count_sig_figs(str(v))
+                            if count > 0:
+                                min_sig_figs = min(min_sig_figs, count)
+                        except:
+                            pass
+            if min_sig_figs == 10: min_sig_figs = 3
+            
+            analysis['min_sig_figs'] = min_sig_figs
+            analysis['x_unit'] = x_unit
+            analysis['y_unit'] = y_unit
                 
             # LaTeX 수식 생성
             latex_equation = equation_to_latex(analysis['equation'], analysis['params'])
@@ -197,15 +236,19 @@ async def prepare_report_md(request: Request):
                 "| 항목 | 내용 |",
                 "| :--- | :--- |",
                 f"| 최적 모델 | {analysis.get('name', 'N/A')} |",
-                f"| 회귀 수식 | ${latex_equation}$ |",
-                f"| 결정계수 ($R^2$) | {analysis.get('r_squared', 0):.4f} |"
+                f"| 회귀 수식 | {latex_equation.replace('$', '')} |",
+                f"| 결정계수 (R²) | {analysis.get('r_squared', 0):.4f} |",
+                f"| X 단위 | {x_unit if x_unit else 'N/A'} |",
+                f"| Y 단위 | {y_unit if y_unit else 'N/A'} |",
+                f"| 유효숫자 기준 | {min_sig_figs} digits |"
             ]
             
             if 'params' in analysis and analysis['params']:
                 p_vals = analysis['params']
                 p_errs = analysis.get('standard_errors', [0.0] * len(p_vals))
                 param_names = ['a', 'b', 'c', 'd', 'e']
-                params_md = [f"{param_names[i] if i < 5 else f'p{i}'} = {v:.4f} (± {e:.4f})" for i, (v, e) in enumerate(zip(p_vals, p_errs))]
+                # format_with_uncertainty uses sigfig-aware rounding for the error and value
+                params_md = [f"{param_names[i] if i < 5 else f'p{i}'} = {format_with_uncertainty(v, e, sig_figs=2)}" for i, (v, e) in enumerate(zip(p_vals, p_errs))]
                 table_rows.append(f"| 추정 파라미터 | {', '.join(params_md)} |")
             
             md_content.append("\n".join(table_rows))
@@ -230,11 +273,6 @@ async def prepare_report_md(request: Request):
             generate_plot_file(x_vals, y_vals, os.path.join(plots_dir, plot_filename), y_pred_vals, x_label, y_label, f"{exp_name} 회귀 분석", x_range=x_range, y_range=y_range, is_log=is_log)
             generate_residual_plot_file(x_vals, residuals_vals, os.path.join(plots_dir, res_filename), x_label, y_label, f"{exp_name} 잔차 분석", x_range=x_range)
             
-            # Markdown links
-            md_content.append(f"![{exp_name} 회귀 분석 그래프]({base_url}/plots/{plot_filename})")
-            md_content.append(f"![{exp_name} 잔차 그래프]({base_url}/plots/{res_filename})")
-            md_content.append("")
-            
             # Capture the first plot URL to return for context usage (e.g., Slash Commands)
             if 'first_plot_url' not in locals():
                 first_plot_url = f"{base_url}/plots/{plot_filename}"
@@ -254,20 +292,33 @@ async def prepare_report_md(request: Request):
                         "y_std": float(np.std(y_vals))
                     }
 
+                # 🛠️ 템플릿 내 그래프 플레이스홀더를 실제 HTML 이미지 태그로 치환 (사이즈 조절 가능하도록)
+                processed_template = template_content
+                if processed_template:
+                    plot_url = f"{base_url}/plots/{plot_filename}"
+                    res_url = f"{base_url}/plots/{res_filename}"
+                    
+                    # HTML 이미지 태그 (사용자가 쉽게 수치 조절 가능)
+                    img_html = f'<img src="{plot_url}" width="600" align="center" />'
+                    res_html = f'<img src="{res_url}" width="600" align="center" />'
+                    
+                    # 다양한 플레이스홀더 패턴 대응
+                    processed_template = processed_template.replace("![실험 그래프]({{graph_path}})", img_html)
+                    processed_template = processed_template.replace("![잔차도]({{residual_path}})", res_html)
+                    processed_template = processed_template.replace("{{graph_path}}", img_html)
+                    processed_template = processed_template.replace("{{residual_path}}", res_html)
+                    # 자유낙하 등 특정 템플릿 대응
+                    processed_template = processed_template.replace("{{graph_trial1_05}}", img_html)
+
                 md_content.append("")  # Blank line before AI section
                 md_content.append(f"#### 📊 AI 실험 결과 분석 및 고찰 ({exp_name})")
-                ai_content = await generate_ai_content(exp_name, analysis, template, template_content, raw_data_summary)
+                
+                # Get CSV raw data from request body (if provided by frontend)
+                csv_raw_data = body.get('csv_raw_data', None)
+                
+                ai_content = await generate_ai_content(exp_name, analysis, template, processed_template, raw_data_summary, csv_raw_data)
                 md_content.append(ai_content)
                 md_content.append("")  # Blank line after AI section
-
-        # Footer Section
-        if template_content:
-            footer_part = ""
-            if "토의 및 결론" in template_content: footer_part = "## 2. 토의 및 결론\n" + template_content.split("토의 및 결론", 1)[1]
-            elif "## 결론" in template_content: footer_part = "## 2. 결론\n" + template_content.split("## 결론", 1)[1]
-            if footer_part:
-                md_content.append("---")
-                md_content.append(footer_part.strip())
 
         final_markdown = "\n\n".join(md_content)
         print(f"DEBUG: Report generated successfully. Total length: {len(final_markdown)} chars")

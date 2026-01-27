@@ -122,6 +122,10 @@ export default function VisualBuilder() {
                                         setXColumn={(col: string) => updateChart(activeUnit.id, activeChart.id, { xColumn: col })}
                                         yColumn={activeChart.yColumn}
                                         setYColumn={(col: string) => updateChart(activeUnit.id, activeChart.id, { yColumn: col })}
+                                        xUnit={activeChart.xUnit || ''}
+                                        setXUnit={(unit: string) => updateChart(activeUnit.id, activeChart.id, { xUnit: unit })}
+                                        yUnit={activeChart.yUnit || ''}
+                                        setYUnit={(unit: string) => updateChart(activeUnit.id, activeChart.id, { yUnit: unit })}
                                         columns={columns}
                                         isLogScale={activeChart.isLogScale}
                                         setIsLogScale={(isLog: boolean) => updateChart(activeUnit.id, activeChart.id, { isLogScale: isLog })}

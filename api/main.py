@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes.analyze import router as analyze_router
+from api.routes.ocr import router as ocr_router
+from api.routes.edit import router as edit_router
 import os
 from dotenv import load_dotenv
 
@@ -27,6 +29,8 @@ from fastapi.responses import FileResponse
 
 # Include routers
 app.include_router(analyze_router, prefix="/api")
+app.include_router(ocr_router, prefix="/api/ocr")
+app.include_router(edit_router, prefix="/api/edit")
 
 # Serve generated plots
 plots_dir = os.path.join(os.path.dirname(__file__), "static", "plots")

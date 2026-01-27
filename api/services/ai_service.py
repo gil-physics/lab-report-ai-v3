@@ -3,152 +3,150 @@ import google.generativeai as genai
 import re
 
 
-async def generate_ai_content(exp_name, analysis, template_id, template_content=None, raw_data_summary=None):
+async def generate_ai_content(exp_name, analysis, template_id, template_content=None, raw_data_summary=None, csv_data=None):
     # Load API key at runtime, not at import time
     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
     if not GOOGLE_API_KEY:
         return "AI API 키가 설정되지 않아 내용을 생성할 수 없습니다."
     
-    # --- [TEMPORARY MOCK MODE FOR QUOTA ISSUES] ---
-    # Return a structured draft locally instead of calling the Gemini API.
-    # To restore AI: 1. Remove this mock block, 2. Uncomment the API logic below.
+    # --- [AI API LOGIC - NOW ACTIVE] ---
+    genai.configure(api_key=GOOGLE_API_KEY)
     
     try:
-        stats_md = ""
+        model = genai.GenerativeModel('gemini-3-flash-preview')
+        
+        # Build prompt using template if available
+        template_context = ""
+        if template_content:
+            template_context = f"\n[참고할 보고서 템플릿 구조]\n{template_content}\n"
+
+        # 📊 CSV 원본 데이터 컨텍스트 추가 (환각 방지)
+        csv_context = ""
+        if csv_data:
+            # 처음 500자만 컨텍스트로 제공 (너무 길면 토큰 낭비)
+            csv_preview = csv_data[:500] if len(csv_data) > 500 else csv_data
+            csv_context = f"""
+[원본 CSV 데이터 (참고용)]
+{csv_preview}
+
+⚠️ 주의: 위 데이터는 참고용입니다. 모든 수치는 아래 '분석 결과 정보'의 Python 계산 값을 정확히 사용하세요.
+"""
+
+        # 📊 데이터 통계 요약 정보 생성
+        data_desc = ""
+        example_citation = ""
         if raw_data_summary:
-            count = int(raw_data_summary.get('count') or 0)
-            x_min = float(raw_data_summary.get('x_min') or 0)
-            x_max = float(raw_data_summary.get('x_max') or 0)
-            y_min = float(raw_data_summary.get('y_min') or 0)
-            y_max = float(raw_data_summary.get('y_max') or 0)
-            y_mean = float(raw_data_summary.get('y_mean') or 0)
-            y_std = float(raw_data_summary.get('y_std') or 0)
-            
-            stats_md = (
-                f"- **데이터 포인트 수**: {count}개\n"
-                f"- **X 범위**: {x_min:.4f} ~ {x_max:.4f}\n"
-                f"- **Y 범위**: {y_min:.4f} ~ {y_max:.4f}\n"
-                f"- **Y 평균**: {y_mean:.4f} (표준편차: {y_std:.4f})"
-            )
-
-        params_md = ""
-        if 'params' in analysis:
-            p_vals = analysis.get('params') or []
-            p_errs = analysis.get('standard_errors') or [0.0] * len(p_vals)
-            p_names = ['a', 'b', 'c', 'd', 'e']
-            params_md = ", ".join([f"**{p_names[i] if i < len(p_names) else f'p{i}'}** = {float(v or 0):.4f} (±{float(e or 0):.4f})" for i, (v, e) in enumerate(zip(p_vals, p_errs))])
-
-        mock_report = f"""
-이 섹션은 현재 할당량 초과(Quota Exceeded)로 인해 AI가 작성한 초안으로 대체되었습니다.
-아래 실험 결과 수치를 바탕으로 직접 분석 내용을 작성해 주시기 바랍니다.
-
-### 1. 실험 결과 분석 요약 ({exp_name})
-
-본 실험을 통해 얻은 데이터 {raw_data_summary.get('count', 0) if raw_data_summary else 'N/A'}개를 바탕으로 **{analysis.get('name', '회귀')} 모델** 분석을 수행한 결과는 다음과 같습니다.
-
-- **분석 모델**: {analysis.get('name') or 'N/A'}
-- **수행된 수식**: $ {analysis.get('equation') or 'N/A'} $
-- **결정계수 ($ R^2 $)**: {float(analysis.get('r_squared') or 0):.4f} (데이터의 {float(analysis.get('r_squared') or 0)*100:.1f}%를 설명함)
-- **주요 파라미터**: {params_md if params_md else "N/A"}
-
-### 2. 데이터 분포 특성
-{stats_md if stats_md else "데이터 요약 정보가 없습니다."}
-
-### 3. 고찰 및 결론 (가이드)
-작성 시 다음 사항을 고려하십시오:
-1. **정밀도 평가**: $ R^2 $ 값이 1에 얼마나 가까운지를 통해 실험 모델의 신뢰성을 기술하세요.
-2. **오차 원인**: 측정 기구의 한계나 환경적 요인(공기 저항, 마찰 등)이 파라미터 표준오차에 미친 영향을 분석하세요.
-3. **이론값 비교**: 도출된 파라미터 값이 실제 물리 상수나 이론값과 얼마나 일치하는지 비교하세요.
+            data_desc = f"""
+        [실험 데이터 통계 요약]
+        - 데이터 개수: {raw_data_summary.get('count', 0)} 개
+        - X값 범위: {raw_data_summary.get('x_min', 0):.4f} ~ {raw_data_summary.get('x_max', 0):.4f}
+        - Y값 범위: {raw_data_summary.get('y_min', 0):.4f} ~ {raw_data_summary.get('y_max', 0):.4f}
+        - Y값 평균: {raw_data_summary.get('y_mean', 0):.4f} (표준편차: {raw_data_summary.get('y_std', 0):.4f})
         """
-        return mock_report.strip()
-        
-    except Exception as e:
-        return f"[시스템 오류] 초안 생성 중 문제 발생: {str(e)}"
-    
-    # --- [ORIGINAL AI API LOGIC - DISABLED] ---
-    # genai.configure(api_key=GOOGLE_API_KEY)
-    
-    # try:
-    #     model = genai.GenerativeModel('gemini-3-flash-preview')
-        
-    #     # Build prompt using template if available
-    #     template_context = ""
-    #     if template_content:
-    #         template_context = f"\n[참고할 보고서 템플릿 구조]\n{template_content}\n"
+            example_citation = f"예: \"측정된 Y값은 평균 {raw_data_summary.get('y_mean', 0):.2f}를 중심으로 {raw_data_summary.get('y_min', 0):.2f}에서 {raw_data_summary.get('y_max', 0):.2f} 사이의 범위를 보였습니다.\""
 
-    #     # 📊 데이터 통계 요약 정보 생성
-    #     data_desc = ""
-    #     example_citation = ""
-    #     if raw_data_summary:
-    #         data_desc = f"""
-    #         [실험 데이터 통계 요약]
-    #         - 데이터 개수: {raw_data_summary.get('count', 0)} 개
-    #         - X값 범위: {raw_data_summary.get('x_min', 0):.4f} ~ {raw_data_summary.get('x_max', 0):.4f}
-    #         - Y값 범위: {raw_data_summary.get('y_min', 0):.4f} ~ {raw_data_summary.get('y_max', 0):.4f}
-    #         - Y값 평균: {raw_data_summary.get('y_mean', 0):.4f} (표준편차: {raw_data_summary.get('y_std', 0):.4f})
-    #         """
-    #         example_citation = f"예: \"측정된 Y값은 평균 {raw_data_summary.get('y_mean', 0):.2f}를 중심으로 {raw_data_summary.get('y_min', 0):.2f}에서 {raw_data_summary.get('y_max', 0):.2f} 사이의 범위를 보였습니다.\""
-
-    #     # 🧠 AI 프롬프트 고도화 (데이터 주입): 환각 방지를 위해 명확한 수치 제공
-    #     params_info = []
-    #     if 'params' in analysis:
-    #         p_vals = analysis.get('params', [])
-    #         p_errs = analysis.get('standard_errors', [0.0] * len(p_vals))
-    #         p_names = ['a', 'b', 'c', 'd', 'e']
-    #         for i, (v, e) in enumerate(zip(p_vals, p_errs)):
-    #             n = p_names[i] if i < len(p_names) else f"p{i}"
-    #             params_info.append(f"{n} = {v:.4f} (±{e:.4f})")
+        # 🧠 AI 프롬프트 고도화 (데이터 주입): 환각 방지를 위해 명확한 수치 제공
+        from api.utils.significant_figures import format_with_uncertainty
         
-    #     params_text = f"주요 파라미터 상세 값: {', '.join(params_info)}" if params_info else ""
-
-    #     prompt = f"""
-    #     당신은 대학교 물리학 실험 조교(TA)이자 전문 연구원입니다. 아래 **실제 실험 데이터 통계**와 분석 결과를 바탕으로 보고서의 '결과 분석 및 토의' 섹션을 작성하세요.
-    #     {template_context}
+        params_info = []
+        if 'params' in analysis:
+            p_vals = analysis.get('params', [])
+            p_errs = analysis.get('standard_errors', [0.0] * len(p_vals))
+            p_names = ['a', 'b', 'c', 'd', 'e']
+            for i, (v, e) in enumerate(zip(p_vals, p_errs)):
+                n = p_names[i] if i < len(p_names) else f"p{i}"
+                # Use scientific formatting for uncertainties
+                params_info.append(f"{n} = {format_with_uncertainty(v, e, sig_figs=2)}")
         
-    #     {data_desc}
-
-    #     [분석 결과 정보]
-    #     실험 주제: {exp_name}
-    #     적용된 물리 이론: {template_id if template_id != 'none' else '기본 물리학 법칙'}
-    #     회귀 모델: {analysis.get('name', analysis.get('model', 'N/A'))}
-    #     도출된 수식: {analysis.get('equation', 'N/A')}
-    #     결정계수 (R²): {analysis.get('r_squared', 0):.4f}
-    #     {params_text}
-
-    #     [작성 가이드라인]
-    #     1. **구체적 수치 인용 (필수)**: 추상적인 표현 대신 위 '실험 데이터 통계 요약'에 있는 **구체적인 수치(최대/최소/평균/표준편차 등)**를 문장에 반드시 인용하세요. 
-    #        - {example_citation if example_citation else '데이터 정밀도와 신뢰성을 수치적으로 제시하십시오.'}
-    #     2. **수식 표현 규칙 (매우 중요)**: 
-    #        - **외부 공백 필수**: 수식 기호($)와 앞뒤 글자 사이에는 **반드시 공백을 한 칸** 두세요. (예: ( $R^2$ ), 값은 $x$ 이다)
-    #        - **내부 공백 금지**: 수식 기호($) 바로 안쪽에는 공백이 없어야 합니다. (예: $R^2$, $E=mc^2$)
-    #        - **독립된 수식($$)**: 복잡한 수식은 앞뒤로 빈 줄을 두어 독립된 줄에 작성하세요.
-    #     3. **데이터 정밀도 평가**: 표준오차와 R² 값을 바탕으로 실험의 정밀도를 수치적으로 평가하세요.
-    #     4. **오차 원인 분석**: 실제 물리적 제약에 따른 오차 원인을 논리적으로 추론하세요.
-    #     5. **가독성**: 중요한 포인트는 불렛 포인트(-)와 굵은 글씨(**)를 사용하여 강조하세요.
-
-    #     [톤 앤 매너]
-    #     - 전문적이고 학구적인 '하십시오체'를 사용하세요.
-    #     - 마크다운 문법을 적절히 활용하세요.
-    #     """
+        params_text = f"주요 파라미터 상세 값 (측정 오차 포함): {', '.join(params_info)}" if params_info else ""
         
-    #     response = await model.generate_content_async(prompt)
+        min_sig_figs = analysis.get('min_sig_figs', 3)
+        x_unit = analysis.get('x_unit', '')
+        y_unit = analysis.get('y_unit', '')
+
+        prompt = f"""
+# Role (역할)
+당신은 대학 물리학 실험 과목의 전문 조교(TA)이자 학술 작문 전문가입니다. 당신의 목표는 제공된 실험 데이터와 배경 지식을 바탕으로 논리적이고, 과학적으로 엄밀하며, 가독성이 뛰어난 '물리학 실험 보고서 초안'을 작성하는 것입니다.
+
+# Task (임무)
+아래 [Input Data]를 바탕으로 물리 실험 보고서를 작성하십시오. 보고서는 일반적인 물리 실험 보고서의 표준 구조(서론, 이론, 실험 방법, 결과 및 분석, 토의, 결론)를 따라야 하며, 특히 데이터 분석과 오차 논의에 있어 깊이 있는 통찰력을 제공해야 합니다.
+
+# Input Data (입력 데이터)
+1. 실험 제목: {exp_name}
+2. 적용된 물리 이론 및 키워드: {template_id if template_id != 'none' else '기본 물리학 법칙'}
+3. [중요] 분석 결과 및 계산값 (Source of Truth):
+   - 회귀 모델: {analysis.get('name', analysis.get('model', 'N/A'))}
+   - 도출된 수식: {analysis.get('equation', 'N/A')}
+   - 결정계수 (R²): {analysis.get('r_squared', 0):.4f}
+   - 최소 유효숫자 기준: {min_sig_figs} 자리
+   - X 단위: {x_unit if x_unit else '없음'}
+   - Y 단위: {y_unit if y_unit else '없음'}
+   - {params_text}
+4. [참고] 실험 데이터 통계 요약:
+   {data_desc if data_desc else "요약 정보 없음"}
+5. [참고] 원본 데이터 미리보기:
+   {csv_context if csv_context else "원본 데이터 없음"}
+6. [참고] 보고서 템플릿 구조:
+   {template_context if template_context else "기본 구조 사용"}
+
+# Guidelines & Constraints (지침 및 제약사항)
+
+## 1. 환각 방지 및 논리 (Anti-Hallucination & Logic)
+- **Zero-Inference:** 제공된 데이터(Input Data 3, 4번)에 없는 수치를 절대 지어내거나 추측하지 마십시오. 데이터가 부족하면 "데이터 부족으로 확인 불가"라고 명시하십시오. **당신이 직접 계산하지 말고, 제공된 계산값(Source of Truth)만 정확히 인용하십시오.**
+- **Scientific Grounding:** 물리 이론을 설명할 때는 학술적으로 검증된 내용만 포함하십시오.
+- **Chain of Thought (CoT):** 결과 분석 및 토의 섹션 작성 시, "데이터가 A 경향을 보이므로 이론값 B와 비교했을 때 C라는 결론이 도출된다"는 식의 논리적 추론 과정을 서술하십시오.
+- **Scientific Precision:** 제공된 유효숫자 기준({min_sig_figs} 자리)을 인지하고, 오차 범위(±)가 포함된 파라미터 값을 논의할 때 그 의미(정밀도, 정확도)를 해석하십시오. 단위({x_unit}, {y_unit})를 누락하지 마십시오.
+
+## 2. 서식 및 표기 규칙 (매우 중요)
+다음의 한국어 텍스트 처리 규칙 및 렌더링 가이드라인을 **반드시** 준수해야 합니다.
+
+- **수식 기호($) 중복 절대 금지 (Parser Error 방지):** 모든 수식은 단일 쌍의 기호로만 감싸야 합니다. 이미 `$ ... $` 형태인 텍스트를 다시 `$` 로 감싸는 행위(예: `$ $...$ $`)를 절대 금지 합니다. 특히 **Input Data 3번** 의 수식은 이미 완성된 LaTeX 형태이므로, 어떠한 기호도 추가하지 말고 **있는 그대로(Raw Text) 인용**하십시오.
+- **토큰 결합 및 공백 규칙:**
+  - **내부 공백 제거:** 수식 기호 바로 안쪽에는 공백이 없어야 합니다. (예: `$R^2$` (O), `$ R^2 $` (X))
+  - **외부 공백 필수:** 수식 기호(`$`)와 한글 조사 또는 단어 사이에는 **반드시 한 칸의 공백** 을 포함하십시오. 이는 텍스트 가독성과 서식 렌더링 최적화를 위함입니다. (예: "결과는 `$x$` 입니다." (O), "결과는`$x$`입니다." (X))
+- **강조 서식(Bold) 띄어쓰기:** `**단어**`의 앞이나 뒤에 한글 조사나 단어가 이어질 경우, 반드시 한 칸 띄우십시오. (예: "**뉴턴** 의 법칙")
+- **LaTeX 문법 및 스타일:**
+  - 모든 수학적 변수는 **이탤릭체**로 표기하며, 표준 LaTeX 문법을 따르십시오.
+  - **Display Mode:** 독립된 줄에 배치할 때는 `$$...$$` 를 사용하십시오.
+  - **Inline Mode:** 문장 중간에 삽입할 때는 `$ ... $` 를 사용하십시오.
+
+## 3. 보고서 구조 (Report Structure)
+- **템플릿 우선 순위:** 제공된 [보고서 템플릿 구조]가 있다면, 해당 템플릿의 목차와 형식을 **절대적으로** 따르십시오. 템플릿에 `[내용을 입력하세요]`와 같은 플레이스홀더가 있다면 이를 분석 결과로 채워 넣으십시오.
+- **기본 구조 (템플릿 없을 시):**
+    1. **서론 (Introduction):** 실험 목적과 배경 이론 소개.
+    2. **실험 방법 (Methods):** 절차를 과거형으로 간결하게 기술.
+    3. **결과 및 분석 (Results & Analysis):** 제공된 분석 결과를 요약하고 주요 경향성 및 오차율을 서술.
+4. **토의 (Discussion):** 오차의 원인을 '계통 오차'와 '우연 오차'로 구분하여 분석. 장비의 한계, 환경적 요인 등을 구체적으로 서술.
+    5. **결론 (Conclusion):** 목적 달성 여부 요약.
+
+# Output Format (출력 형식)
+- 제공된 템플릿의 내용을 **그대로 유지**하면서, 플레이스홀더 부분만 당신의 전문적인 분석으로 교체하여 완성된 보고서를 출력하십시오.
+- **HTML 이미지 태그 보존 (IMPORTANT):** 템플릿 내에 포함된 `<img src="..." width="..." align="..." />` 와 같은 HTML 태그는 그래프를 출력하기 위한 중요한 코드입니다. 이를 **절대 삭제하거나 변경하지 말고 그대로 출력**에 포함하십시오.
+- **데이터 중심 분석:** 그래프 이미지를 직접 설명하려 하지 말고(예: "빨간 선이 보입니다"), 제공된 **수치 데이터(Input Data 3번)**인 결정계수, 기울기, 오차값 등을 바탕으로 현상을 논리적으로 해석하십시오.
+- 전체 출력은 Markdown 형식을 사용하십시오.
+- 주요 섹션은 `##` 또는 템플릿에 정의된 헤더 수준으로 구분하십시오.
+
+지금부터 위 지침을 완벽히 숙지하고 보고서 초안 작성을 시작하십시오.
+"""
         
-    #     # Check if response was blocked or has no text
-    #     if not response.text:
-    #         # ... (error handling remains same)
-    #         error_details = []
-    #         if hasattr(response, 'prompt_feedback'):
-    #             error_details.append(f"Prompt feedback: {response.prompt_feedback}")
-    #         if hasattr(response, 'candidates') and response.candidates:
-    #             for i, candidate in enumerate(response.candidates):
-    #                 error_details.append(f"Candidate {i} finish_reason: {candidate.finish_reason}")
+        response = await model.generate_content_async(prompt)
+        
+        # Check if response was blocked or has no text
+        if not response.text:
+            error_details = []
+            if hasattr(response, 'prompt_feedback'):
+                error_details.append(f"Prompt feedback: {response.prompt_feedback}")
+            if hasattr(response, 'candidates') and response.candidates:
+                for i, candidate in enumerate(response.candidates):
+                    error_details.append(f"Candidate {i} finish_reason: {candidate.finish_reason}")
             
-    #         error_msg = "AI 응답이 비어있습니다. " + " | ".join(error_details) if error_details else "AI 응답이 생성되지 않았습니다."
-    #         return error_msg
+            error_msg = "AI 응답이 비어있습니다. " + " | ".join(error_details) if error_details else "AI 응답이 생성되지 않았습니다."
+            return error_msg
         
-    #     return response.text
-    # except Exception as e:
-    #     error_str = str(e)
-    #     if "429" in error_str or "quota" in error_str.lower():
-    #         return "AI 생성 할당량(Quota)을 초과했습니다. 무료 티어의 일일 제한(20회)에 도달한 것 같습니다. 잠시 후 다시 시도하거나 내일 다시 이용해 주세요."
-    #     return f"AI 내용 생성 중 오류 발생: {error_str}"
+        return response.text
+    except Exception as e:
+        error_str = str(e)
+        if "429" in error_str or "quota" in error_str.lower():
+            return "AI 생성 할당량(Quota)을 초과했습니다. 무료 티어의 일일 제한에 도달한 것 같습니다. 잠시 후 다시 시도하거나 내일 다시 이용해 주세요."
+        return f"AI 내용 생성 중 오류 발생: {error_str}"
+

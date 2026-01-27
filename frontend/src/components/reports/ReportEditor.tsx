@@ -14,6 +14,28 @@ import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
 import Image from '@tiptap/extension-image';
+const ResizableImage = Image.extend({
+    addAttributes() {
+        return {
+            ...this.parent?.(),
+            width: {
+                default: '600',
+                renderHTML: attributes => ({
+                    width: attributes.width,
+                }),
+                parseHTML: element => element.getAttribute('width'),
+            },
+            align: {
+                default: 'center',
+                renderHTML: attributes => ({
+                    align: attributes.align,
+                    style: attributes.align === 'center' ? 'display: block; margin: 0 auto;' : '',
+                }),
+                parseHTML: element => element.getAttribute('align'),
+            },
+        };
+    },
+});
 import Highlight from '@tiptap/extension-highlight';
 import TextAlign from '@tiptap/extension-text-align';
 import tippy from 'tippy.js';
@@ -202,7 +224,9 @@ export default function ReportEditor() {
 
     const extensions = useMemo(() => [
         StarterKit,
-        Markdown,
+        Markdown.configure({
+            html: true, // Preserve <img> tags
+        }),
         Mathematics.configure({
             katexOptions: {
                 throwOnError: false,
@@ -214,7 +238,7 @@ export default function ReportEditor() {
         TableRow,
         TableHeader,
         TableCell,
-        Image,
+        ResizableImage,
         Highlight,
         TextAlign.configure({
             types: ['heading', 'paragraph'],

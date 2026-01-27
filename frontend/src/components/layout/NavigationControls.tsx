@@ -24,6 +24,23 @@ export default function NavigationControls() {
 
     const currentStep = getCurrentStep();
 
+    const handleExport = () => {
+        if (!generatedMarkdown) return;
+        const blob = new Blob([generatedMarkdown], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Lab_Report_${new Date().toISOString().slice(0, 10)}.md`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    const handlePrint = () => {
+        window.print();
+    };
+
     const handleNext = () => {
         if (currentStep === 1) navigate('/visualize');
         else if (currentStep === 2) {
@@ -42,7 +59,6 @@ export default function NavigationControls() {
 
     const canProceed = () => {
         if (currentStep === 1) return units.length > 0;
-        // Add logic for step 2 verification later
         return true;
     };
 
@@ -71,13 +87,22 @@ export default function NavigationControls() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {currentStep === 3 && (
+                        <button
+                            onClick={handlePrint}
+                            className="flex items-center px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                            title="Print or Save as PDF"
+                        >
+                            Print
+                        </button>
+                    )}
                     <button
-                        onClick={currentStep === 3 ? undefined : handleNext}
-                        disabled={currentStep === 3 ? false : !canProceed()}
+                        onClick={currentStep === 3 ? handleExport : handleNext}
+                        disabled={currentStep === 3 ? !generatedMarkdown : !canProceed()}
                         className={cn(
                             "flex items-center px-6 py-2 rounded-xl text-sm font-bold transition-all duration-300 group relative",
                             currentStep === 3
-                                ? "border-2 border-emerald-600 text-emerald-600 hover:bg-emerald-600 hover:text-white"
+                                ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-95"
                                 : canProceed()
                                     ? "text-blue-600 border-2 border-transparent hover:border-blue-600 hover:bg-blue-50/50 active:scale-95"
                                     : "text-slate-300 cursor-not-allowed"
@@ -86,7 +111,7 @@ export default function NavigationControls() {
                         {currentStep === 3 ? (
                             <>
                                 <Save size={18} className="mr-2" />
-                                Export Report
+                                Download .md
                             </>
                         ) : (
                             <>

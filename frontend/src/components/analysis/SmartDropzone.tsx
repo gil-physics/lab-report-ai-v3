@@ -16,12 +16,13 @@ type SelectionMode = 'header' | 'data';
 const SmartDropzone: React.FC = () => {
     const navigate = useNavigate();
     const {
-        setFile, setRawRows, rawRows, units, addUnit, removeUnit,
-        setActiveStep
+        setFile, setRawRows, rawRows, setRawRowsStrings, rawRowsStrings, units, addUnit, removeUnit,
+        setActiveStep, setCsvRawData
     } = useAnalysis();
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>('idle');
+    const [processingMessage, setProcessingMessage] = useState<string>('');
 
     // --- Slicing State (Active Selection) ---
     const [headerRow, setHeaderRow] = useState<number>(0);
@@ -66,6 +67,8 @@ const SmartDropzone: React.FC = () => {
 
         try {
             const text = await file.text();
+
+            // First parse: auto-typed for analysis
             Papa.parse(text, {
                 header: false,
                 dynamicTyping: true,
@@ -75,7 +78,19 @@ const SmartDropzone: React.FC = () => {
                     if (rows && rows.length > 0) {
                         setFile(file);
                         setRawRows(rows);
-                        setUploadStatus('success');
+                        // Store CSV raw data for AI context (Feature 2)
+                        setCsvRawData(text);
+
+                        // Second parse: raw strings for sig-fig tracking
+                        Papa.parse(text, {
+                            header: false,
+                            dynamicTyping: false,
+                            skipEmptyLines: false,
+                            complete: (rawResults) => {
+                                setRawRowsStrings(rawResults.data as any[][]);
+                                setUploadStatus('success');
+                            }
+                        });
                     } else {
                         throw new Error("데이터가 비어있거나 형식이 올바르지 않습니다.");
                     }
@@ -89,7 +104,7 @@ const SmartDropzone: React.FC = () => {
             setUploadStatus('error');
             setIsProcessing(false);
         }
-    }, [setFile, setRawRows]);
+    }, [setFile, setRawRows, setCsvRawData]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
@@ -98,11 +113,79 @@ const SmartDropzone: React.FC = () => {
     });
 
     const onImageDrop = useCallback(async (acceptedFiles: File[]) => {
-        const file = acceptedFiles[0];
-        if (!file) return;
-        // OCR Logic will go here
-        alert("OCR 기능은 현재 준비 중입니다! 이미지가 정상적으로 감지되었습니다.");
-    }, []);
+        const imageFile = acceptedFiles[0];
+        if (!imageFile) return;
+
+        setIsProcessing(true);
+        setUploadStatus('idle');
+
+        try {
+            // Step 1: OCR 시작
+            setProcessingMessage('📸 OCR 텍스트 추출 중...');
+
+            const formData = new FormData();
+            formData.append('file', imageFile);
+
+            const response = await fetch('http://localhost:8000/api/ocr/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error('OCR processing failed');
+            }
+
+            // Step 2: AI 재배치
+            setProcessingMessage('🤖 AI가 데이터 재배치 중...');
+
+            const data = await response.json();
+
+            if (data.status === 'success' && data.csv_data) {
+                // Step 3: CSV 파싱
+                setProcessingMessage('✅ CSV 변환 완료!');
+
+                // Parse CSV data
+                Papa.parse(data.csv_data, {
+                    header: false,
+                    dynamicTyping: true,
+                    skipEmptyLines: false,
+                    complete: (results) => {
+                        const rows = results.data as any[][];
+                        if (rows && rows.length > 0) {
+                            setFile(imageFile);
+                            setRawRows(rows);
+                            setCsvRawData(data.csv_data);
+
+                            // Parse again for raw strings
+                            Papa.parse(data.csv_data, {
+                                header: false,
+                                dynamicTyping: false,
+                                skipEmptyLines: false,
+                                complete: (rawResults) => {
+                                    setRawRowsStrings(rawResults.data as any[][]);
+                                    setUploadStatus('success');
+                                    setProcessingMessage('');
+                                }
+                            });
+                        } else {
+                            throw new Error("데이터가 비어있거나 형식이 올바르지 않습니다.");
+                        }
+                        setIsProcessing(false);
+                    },
+                    error: (err: Error) => {
+                        throw new Error(err.message);
+                    }
+                });
+            } else {
+                throw new Error(data.message || 'OCR failed');
+            }
+        } catch (err: any) {
+            setUploadStatus('error');
+            setIsProcessing(false);
+            setProcessingMessage('');
+            alert(`OCR 오류: ${err.message}`);
+        }
+    }, [setFile, setRawRows, setCsvRawData]);
 
     const { getRootProps: getImageProps, getInputProps: getImageInputProps, isDragActive: isImageActive } = useDropzone({
         onDrop: onImageDrop,
@@ -116,14 +199,37 @@ const SmartDropzone: React.FC = () => {
         const dataRows = rawRows.slice(dataStart, dataEnd + 1);
         const colSlice = headerCells.slice(colRange[0], colRange[1] + 1);
 
-        const unitColumns = colSlice.map((h, i) => String(h || `Column_${colRange[0] + i}`));
+        // Make column names unique (fix duplicate names)
+        const columnCounts = new Map<string, number>();
+        const unitColumns = colSlice.map((h, i) => {
+            let colName = String(h || `Column_${colRange[0] + i}`);
+
+            // If column name already exists, append number
+            if (columnCounts.has(colName)) {
+                const count = columnCounts.get(colName)! + 1;
+                columnCounts.set(colName, count);
+                colName = `${colName}_${count}`;
+            } else {
+                columnCounts.set(colName, 1);
+            }
+
+            return colName;
+        });
+
         const unitData = dataRows.map(row => {
-            const rowSlice = row.slice(colRange[0], colRange[1] + 1);
-            const obj: any = {};
-            unitColumns.forEach((col, i) => {
-                obj[col] = rowSlice[i];
+            const rowData: any = {};
+            unitColumns.forEach((col, idx) => {
+                const val = row[colRange[0] + idx];
+                rowData[col] = val;
             });
-            return obj;
+            return rowData;
+        });
+
+        // Also extract raw strings for sig-fig counting
+        const rawRowsRange = rawRowsStrings.slice(dataStart, dataEnd + 1);
+        const unitRawStrings: Record<string, string[]> = {};
+        unitColumns.forEach((col, idx) => {
+            unitRawStrings[col] = rawRowsRange.map(row => String(row[colRange[0] + idx] || ''));
         });
 
         addUnit({
@@ -136,6 +242,7 @@ const SmartDropzone: React.FC = () => {
             excludedColumns: [],
             columns: unitColumns,
             data: unitData,
+            rawStrings: unitRawStrings,
             charts: [], // Initialize with empty charts
             derivedVariables: [],
             activeChartId: null
@@ -459,15 +566,24 @@ const SmartDropzone: React.FC = () => {
                         `}
                     >
                         <motion.div key="i" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                            <div className="w-16 h-16 bg-slate-200 text-slate-400 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-xl">
+                            <div className="w-16 h-16 bg-emerald-600 text-white rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-xl shadow-emerald-500/30">
                                 <Camera strokeWidth={3} size={28} />
                             </div>
-                            <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 mb-4 tracking-tight uppercase">Coming Soon</div>
-                            <h3 className="text-xl font-black text-slate-400 mb-2">실험 사진 업로드 (OCR)</h3>
-                            <p className="text-sm text-slate-300 font-medium mb-8 opacity-60">종이에 적힌 수동 측정 데이터 기반</p>
+                            <h3 className="text-xl font-black text-slate-800 mb-2">실험 사진 업로드 (OCR)</h3>
+                            <p className="text-sm text-slate-500 font-medium mb-8">종이에 적힌 수동 측정 데이터 기반</p>
+
+                            {/* Processing Message */}
+                            {isProcessing && processingMessage && (
+                                <div className="mb-6 py-3 px-4 bg-purple-50 border-2 border-purple-200 rounded-xl">
+                                    <p className="text-sm text-purple-700 font-bold animate-pulse">
+                                        {processingMessage}
+                                    </p>
+                                </div>
+                            )}
+
                             <div className="flex justify-center gap-2">
-                                <span className="px-2 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-400 uppercase tracking-tight">Vision AI</span>
-                                <span className="px-2 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-400 uppercase tracking-tight">Auto CSV</span>
+                                <span className="px-2 py-1 bg-emerald-100 rounded-lg text-[9px] font-black text-emerald-600 uppercase tracking-tight">Vision AI</span>
+                                <span className="px-2 py-1 bg-emerald-100 rounded-lg text-[9px] font-black text-emerald-600 uppercase tracking-tight">Auto CSV</span>
                             </div>
                         </motion.div>
                     </motion.div>

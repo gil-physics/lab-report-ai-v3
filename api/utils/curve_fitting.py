@@ -242,7 +242,8 @@ def equation_to_latex(equation, params):
     Returns:
     - LaTeX 형식 문자열
     """
-    latex_eq = equation
+    # Remove any existing $ signs to prevent nested delimiters
+    latex_eq = equation.replace('$', '')
     
     # 매개변수 치환
     param_names = ['a', 'b', 'c', 'd', 'e', 'f']

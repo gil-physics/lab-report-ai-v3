@@ -12,6 +12,10 @@ interface ChartControlPanelProps {
     setXColumn: (value: string) => void;
     yColumn: string;
     setYColumn: (value: string) => void;
+    xUnit: string;
+    setXUnit: (value: string) => void;
+    yUnit: string;
+    setYUnit: (value: string) => void;
     columns: string[];
     isLogScale?: boolean;
     setIsLogScale?: (value: boolean) => void;
@@ -42,6 +46,10 @@ export default function ChartControlPanel({
     setXColumn,
     yColumn,
     setYColumn,
+    xUnit,
+    setXUnit,
+    yUnit,
+    setYUnit,
     columns,
     isLogScale = false,
     setIsLogScale = () => { },
@@ -217,6 +225,12 @@ export default function ChartControlPanel({
                             </Select.Content>
                         </Select.Portal>
                     </Select.Root>
+                    <input
+                        placeholder="Unit (e.g. s, m, kg)"
+                        className="mt-1.5 w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-violet-500/10 focus:border-violet-400 outline-none transition-all shadow-sm"
+                        value={xUnit}
+                        onChange={(e) => setXUnit(e.target.value)}
+                    />
                 </div>
 
                 {/* Y Axis */}
@@ -252,6 +266,12 @@ export default function ChartControlPanel({
                             </Select.Content>
                         </Select.Portal>
                     </Select.Root>
+                    <input
+                        placeholder="Unit (e.g. m/s, N, J)"
+                        className="mt-1.5 w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-violet-500/10 focus:border-violet-400 outline-none transition-all shadow-sm"
+                        value={yUnit}
+                        onChange={(e) => setYUnit(e.target.value)}
+                    />
                 </div>
 
                 {/* Log Scale Switch */}

@@ -31,6 +31,10 @@ interface AnalysisContextType {
     // 📊 Workspace Data (Raw & Live Scrubbing)
     rawRows: any[][];
     setRawRows: (rows: any[][]) => void;
+    rawRowsStrings: any[][];
+    setRawRowsStrings: (rows: any[][]) => void;
+    csvRawData: string | null;
+    setCsvRawData: (data: string | null) => void;
 
     // 🧬 Computed/Active Data (for the currently selected unit & chart)
     activeUnit: AnalysisUnit | null;
@@ -61,6 +65,8 @@ export const AnalysisProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [activeStep, setActiveStep] = useState<Step>('upload');
     const [file, setFile] = useState<File | null>(null);
     const [rawRows, setRawRows] = useState<any[][]>([]);
+    const [rawRowsStrings, setRawRowsStrings] = useState<any[][]>([]);
+    const [csvRawData, setCsvRawData] = useState<string | null>(null);
 
     // Units state
     const [units, setUnits] = useState<AnalysisUnit[]>([]);
@@ -106,6 +112,8 @@ export const AnalysisProvider: React.FC<{ children: ReactNode }> = ({ children }
             name: name || `G${chartNum}: ${y} vs ${x}`,
             xColumn: x,
             yColumn: y,
+            xUnit: '',
+            yUnit: '',
             chartType: 'scatter',
             theme: 'scientific',
             isLogScale: false,
@@ -215,11 +223,22 @@ export const AnalysisProvider: React.FC<{ children: ReactNode }> = ({ children }
                 const xData = enrichedData.map(d => d[activeChart.xColumn]);
                 const yData = enrichedData.map(d => d[activeChart.yColumn]);
 
+                // Extract raw strings for these specific columns
+                const rawX = activeUnit.rawStrings?.[activeChart.xColumn] || [];
+                const rawY = activeUnit.rawStrings?.[activeChart.yColumn] || [];
+
                 const response = await fetch(getApiUrl('/api/analyze'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        data: { x: xData, y: yData },
+                        data: {
+                            x: xData,
+                            y: yData,
+                            x_unit: activeChart.xUnit,
+                            y_unit: activeChart.yUnit,
+                            raw_x: rawX,
+                            raw_y: rawY
+                        },
                         options: {
                             remove_outliers: false,
                             x_range: [activeChart.xMin, activeChart.xMax],
@@ -240,11 +259,12 @@ export const AnalysisProvider: React.FC<{ children: ReactNode }> = ({ children }
         }, 500); // Debounce to avoid spamming the backend
 
         return () => clearTimeout(timer);
-    }, [activeUnitId, activeChart?.xColumn, activeChart?.yColumn, activeChart?.xMin, activeChart?.xMax, activeChart?.yMin, activeChart?.yMax, enrichedData.length]);
+    }, [activeUnitId, activeChart?.xColumn, activeChart?.yColumn, activeChart?.xMin, activeChart?.xMax, activeChart?.yMin, activeChart?.yMax, activeChart?.xUnit, activeChart?.yUnit, enrichedData.length]);
 
     const resetAnalysis = () => {
         setFile(null);
         setRawRows([]);
+        setRawRowsStrings([]);
         setUnits([]);
         setActiveUnitId(null);
         setAnalysisResult(null);
@@ -263,6 +283,8 @@ export const AnalysisProvider: React.FC<{ children: ReactNode }> = ({ children }
                 activeUnitId, setActiveUnitId,
                 addChart, removeChart, updateChart, setActiveChartId,
                 rawRows, setRawRows,
+                rawRowsStrings, setRawRowsStrings,
+                csvRawData, setCsvRawData,
                 activeUnit,
                 activeChart,
                 enrichedData,

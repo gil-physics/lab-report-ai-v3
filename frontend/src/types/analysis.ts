@@ -53,6 +53,8 @@ export interface AnalysisChart {
     xMax: number | '';
     yMin: number | '';
     yMax: number | '';
+    xUnit?: string;
+    yUnit?: string;
 }
 
 export interface AnalysisUnit {
@@ -72,6 +74,7 @@ export interface AnalysisUnit {
     derivedVariables: DerivedVariable[];
     activeChartId: string | null;
     backendAnalysis?: BackendAnalysis | null;
+    rawStrings?: Record<string, string[]>; // Store raw string representations for sig-fig counting
 }
 
 export interface BackendAnalysis {
