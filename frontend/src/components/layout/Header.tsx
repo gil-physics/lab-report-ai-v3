@@ -23,7 +23,7 @@ export default function Header() {
                 {/* Right Section: User & Settings (Placeholder for now) */}
                 <div className="flex items-center justify-end space-x-4 w-64">
                     <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-medium text-sm hover:bg-slate-200 transition-colors cursor-pointer">
-                        JD
+                        SW
                     </div>
                 </div>
             </div>

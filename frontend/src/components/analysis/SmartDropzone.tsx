@@ -4,14 +4,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Upload, AlertCircle, FileSpreadsheet, Database,
     LayoutGrid, Plus, Trash2, ChevronRight,
-    Target, Flag, Play, Anchor, MousePointer2, Camera
+    Target, Flag, Play, MousePointer2, Camera, Pencil
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { useAnalysis } from '../../context/AnalysisContext';
 import { analyzeTypeUniformity, detectParallelBlocks } from '../../lib/physicsKeywords';
 import { useNavigate } from 'react-router-dom';
 
-type SelectionMode = 'header' | 'data';
+type SelectionMode = 'header' | 'data' | 'edit';
 
 const SmartDropzone: React.FC = () => {
     const navigate = useNavigate();
@@ -36,6 +36,38 @@ const SmartDropzone: React.FC = () => {
     // --- Drag Interaction State ---
     const [isDragging, setIsDragging] = useState(false);
     const [dragAnchor, setDragAnchor] = useState<number | null>(null);
+
+    // --- Cell Editing State ---
+    const [editingCell, setEditingCell] = useState<{ row: number; col: number } | null>(null);
+    const [editValue, setEditValue] = useState('');
+
+    // --- Cell Edit Handlers ---
+    const handleCellDoubleClick = (rowIdx: number, colIdx: number, currentValue: any) => {
+        setEditingCell({ row: rowIdx, col: colIdx });
+        setEditValue(String(currentValue ?? ''));
+    };
+
+    const handleCellSave = (rowIdx: number, colIdx: number) => {
+        const newRows = [...rawRows];
+        const newValue = editValue.trim();
+        // Try to convert to number if possible
+        const numValue = parseFloat(newValue);
+        newRows[rowIdx][colIdx] = isNaN(numValue) ? newValue : numValue;
+        setRawRows(newRows);
+
+        // Also update rawRowsStrings
+        const newStrings = [...rawRowsStrings];
+        newStrings[rowIdx][colIdx] = newValue;
+        setRawRowsStrings(newStrings);
+
+        setEditingCell(null);
+        setEditValue('');
+    };
+
+    const handleCellCancel = () => {
+        setEditingCell(null);
+        setEditValue('');
+    };
 
     // --- Initialization ---
     useEffect(() => {
@@ -295,29 +327,73 @@ const SmartDropzone: React.FC = () => {
                 <main className="flex-1 flex overflow-hidden">
                     {/* 2. Left Side: Interactive Grid (Playground) */}
                     <div className="flex-1 flex flex-col overflow-hidden bg-white border-r border-slate-200">
-                        <div className="p-4 bg-slate-50/50 border-b border-slate-200 flex flex-col space-y-3">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-6">
-                                    <div className="flex items-center space-x-2">
-                                        <Target className="w-4 h-4 text-blue-500" />
-                                        <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Slicing Playground</span>
-                                    </div>
-                                    <p className="text-[11px] text-slate-400 font-medium">헤더는 클릭해서, 데이터 범위는 드래그해서 선택하세요.</p>
+                        <div className="p-4 bg-gradient-to-r from-slate-50 to-blue-50/30 border-b border-slate-200 flex flex-col space-y-4">
+                            {/* Selection Status Summary Panel */}
+                            <div className="bg-white rounded-2xl border-2 border-blue-100 p-4 shadow-sm">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-xs font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                                        📋 현재 선택 상태
+                                    </h3>
+                                    <span className="text-[10px] text-slate-400 font-medium">
+                                        {selectionMode === 'edit' ? '✏️ 편집 모드 - 셀을 클릭하여 수정' : '아래에서 모드를 선택하세요'}
+                                    </span>
                                 </div>
-                                <div className="flex bg-white rounded-xl border border-slate-200 p-1 shadow-sm">
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
+                                        <div className="text-[10px] font-black text-blue-400 uppercase mb-1 flex items-center gap-1">
+                                            <Database size={12} /> 헤더 행
+                                        </div>
+                                        <div className="text-lg font-black text-blue-600">Row {headerRow + 1}</div>
+                                    </div>
+                                    <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-200">
+                                        <div className="text-[10px] font-black text-emerald-400 uppercase mb-1 flex items-center gap-1">
+                                            <Flag size={12} /> 데이터 범위
+                                        </div>
+                                        <div className="text-lg font-black text-emerald-600">Row {dataStart + 1} ~ {dataEnd + 1}</div>
+                                    </div>
+                                    <div className="bg-purple-50 rounded-xl p-3 border border-purple-200">
+                                        <div className="text-[10px] font-black text-purple-400 uppercase mb-1 flex items-center gap-1">
+                                            <LayoutGrid size={12} /> 열 범위
+                                        </div>
+                                        <div className="text-lg font-black text-purple-600">Col {colRange[0] + 1} ~ {colRange[1] + 1}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Mode Selector - Enhanced */}
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-4">
+                                    <div className="flex items-center space-x-2">
+                                        <Target className="w-5 h-5 text-blue-500" />
+                                        <span className="text-sm font-black text-slate-600">작업 모드</span>
+                                    </div>
+                                    <p className="text-xs text-slate-400 font-medium">
+                                        {selectionMode === 'header' && '헤더 행을 클릭하세요'}
+                                        {selectionMode === 'data' && '데이터 범위를 드래그하세요'}
+                                        {selectionMode === 'edit' && '수정할 셀을 클릭하세요'}
+                                    </p>
+                                </div>
+                                <div className="flex bg-white rounded-2xl border-2 border-slate-200 p-1.5 shadow-md">
                                     <button
                                         onClick={() => setSelectionMode('header')}
-                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all flex items-center space-x-1.5 ${selectionMode === 'header' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                                        className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center space-x-2 ${selectionMode === 'header' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
                                     >
-                                        <Database size={12} />
-                                        <span>SET HEADER</span>
+                                        <Database size={16} />
+                                        <span>헤더 선택</span>
                                     </button>
                                     <button
                                         onClick={() => setSelectionMode('data')}
-                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all flex items-center space-x-1.5 ${selectionMode === 'data' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                                        className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center space-x-2 ${selectionMode === 'data' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
                                     >
-                                        <MousePointer2 size={12} />
-                                        <span>DRAG DATA</span>
+                                        <MousePointer2 size={16} />
+                                        <span>데이터 범위</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setSelectionMode('edit')}
+                                        className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center space-x-2 ${selectionMode === 'edit' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                                    >
+                                        <Pencil size={16} />
+                                        <span>셀 편집</span>
                                     </button>
                                 </div>
                             </div>
@@ -392,28 +468,84 @@ const SmartDropzone: React.FC = () => {
                                                 onMouseDown={handleMouseDown}
                                                 onMouseEnter={handleMouseEnter}
                                                 onMouseUp={handleMouseUp}
-                                                className={`group transition-all select-none cursor-pointer relative ${isHeader ? 'bg-blue-600 text-white shadow-xl z-20' : isData ? 'bg-emerald-50/50' : 'hover:bg-slate-50'}`}
+                                                className={`group transition-all select-none cursor-pointer relative 
+                                                    ${isHeader ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-xl z-20' : ''} 
+                                                    ${isStart && !isHeader ? 'border-t-4 border-t-emerald-500' : ''} 
+                                                    ${isEnd && !isHeader ? 'border-b-4 border-b-red-500' : ''} 
+                                                    ${isData && !isHeader ? 'bg-emerald-50/50' : ''} 
+                                                    ${!isHeader && !isData ? 'hover:bg-slate-50' : ''}`}
                                             >
-                                                <td className={`p-2 border-b border-r border-slate-100 text-center text-[10px] font-bold ${isHeader ? 'text-white' : 'text-slate-300'} relative w-12`}>
-                                                    <span className={isHeader || isStart || isEnd ? 'opacity-0' : 'opacity-100'}>{idx + 1}</span>
-                                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                        {isHeader && <Database size={12} className="text-white" />}
-                                                        {isStart && <Flag size={12} className="text-emerald-600" />}
-                                                        {isEnd && <Anchor size={12} className="text-red-600" />}
+                                                {/* Row Number Cell with Labels */}
+                                                <td className={`p-2 border-b border-r border-slate-100 text-center text-[10px] font-bold ${isHeader ? 'text-white bg-blue-700' : 'text-slate-300'} relative w-16`}>
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        {isHeader && (
+                                                            <span className="bg-white/20 px-1.5 py-0.5 rounded text-[9px] font-black">HEADER</span>
+                                                        )}
+                                                        {isStart && !isHeader && (
+                                                            <span className="bg-emerald-500 text-white px-1.5 py-0.5 rounded text-[9px] font-black">시작</span>
+                                                        )}
+                                                        {isEnd && !isHeader && !isStart && (
+                                                            <span className="bg-red-500 text-white px-1.5 py-0.5 rounded text-[9px] font-black">끝</span>
+                                                        )}
+                                                        {isEnd && isStart && !isHeader && (
+                                                            <span className="bg-orange-500 text-white px-1.5 py-0.5 rounded text-[9px] font-black">유일</span>
+                                                        )}
+                                                        {!isHeader && !isStart && !isEnd && (
+                                                            <span>{idx + 1}</span>
+                                                        )}
                                                     </div>
                                                 </td>
-                                                {row.map((cell, cIdx) => (
-                                                    <td
-                                                        key={cIdx}
-                                                        className={`p-3 border-b border-r border-slate-100 truncate max-w-[200px] text-xs font-mono transition-all ${cIdx < colRange[0] || cIdx > colRange[1] ? 'opacity-20 grayscale scale-[0.98]' : ''} ${isHeader ? 'font-black border-blue-500' : isData ? 'text-slate-700' : 'text-slate-400'}`}
-                                                    >
-                                                        {cell === null || cell === undefined || String(cell).trim() === "" ? (
-                                                            <span className="text-[10px] text-slate-300 font-black opacity-40">X</span>
-                                                        ) : (
-                                                            String(cell)
-                                                        )}
-                                                    </td>
-                                                ))}
+                                                {/* Data Cells - Editable on double-click */}
+                                                {row.map((cell, cIdx) => {
+                                                    const isEditing = editingCell?.row === idx && editingCell?.col === cIdx;
+                                                    const isInColRange = cIdx >= colRange[0] && cIdx <= colRange[1];
+
+                                                    return (
+                                                        <td
+                                                            key={cIdx}
+                                                            className={`p-0 border-b border-r border-slate-100 max-w-[200px] text-xs font-mono transition-all 
+                                                                ${!isInColRange ? 'opacity-20 grayscale scale-[0.98]' : ''} 
+                                                                ${isHeader ? 'font-black border-blue-500' : isData ? 'text-slate-700' : 'text-slate-400'}
+                                                                ${isEditing ? 'ring-2 ring-blue-500 ring-inset' : ''}`}
+                                                        >
+                                                            {isEditing ? (
+                                                                <input
+                                                                    type="text"
+                                                                    autoFocus
+                                                                    value={editValue}
+                                                                    onChange={(e) => setEditValue(e.target.value)}
+                                                                    onBlur={() => handleCellSave(idx, cIdx)}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') {
+                                                                            handleCellSave(idx, cIdx);
+                                                                        } else if (e.key === 'Escape') {
+                                                                            handleCellCancel();
+                                                                        }
+                                                                    }}
+                                                                    className="w-full h-full px-3 py-2 bg-blue-50 outline-none font-mono text-xs"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                />
+                                                            ) : (
+                                                                <div
+                                                                    className={`px-3 py-2 truncate transition-colors ${selectionMode === 'edit' ? 'cursor-pointer hover:bg-orange-50 hover:ring-2 hover:ring-orange-300 hover:ring-inset' : 'cursor-default'}`}
+                                                                    onClick={(e) => {
+                                                                        if (selectionMode === 'edit') {
+                                                                            e.stopPropagation();
+                                                                            handleCellDoubleClick(idx, cIdx, cell);
+                                                                        }
+                                                                    }}
+                                                                    title={selectionMode === 'edit' ? '클릭하여 수정' : undefined}
+                                                                >
+                                                                    {cell === null || cell === undefined || String(cell).trim() === "" ? (
+                                                                        <span className="text-[10px] text-slate-300 font-black opacity-40">-</span>
+                                                                    ) : (
+                                                                        String(cell)
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                    );
+                                                })}
                                             </tr>
                                         );
                                     })}

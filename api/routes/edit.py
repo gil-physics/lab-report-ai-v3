@@ -10,7 +10,7 @@ import os
 # Ensure services are importable
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from api.services.edit_service import generate_section, modify_section
+from api.services.edit_service import generate_section, modify_section, rewrite_text, PRESET_PROMPTS
 
 router = APIRouter()
 
@@ -123,6 +123,68 @@ async def modify_existing_section(request: Request):
         )
 
 
+@router.post("/rewrite")
+async def rewrite_text_endpoint(request: Request):
+    """
+    Simple text rewrite with custom or preset prompt
+    
+    Request body:
+    {
+        "text": "원본 텍스트...",
+        "prompt": "학술적으로 수정해주세요" | null,
+        "preset": "formal" | "concise" | "expand" | "grammar" | null
+    }
+    
+    Either prompt or preset is required
+    """
+    try:
+        body = await request.json()
+        
+        text = body.get("text", "")
+        if not text:
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "message": "Text is required"}
+            )
+        
+        prompt = body.get("prompt")
+        preset = body.get("preset")
+        
+        # Use preset prompt if specified
+        if preset and preset in PRESET_PROMPTS:
+            prompt = PRESET_PROMPTS[preset]
+        
+        if not prompt:
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "message": "Either prompt or preset is required"}
+            )
+        
+        result = await rewrite_text(text, prompt)
+        
+        return JSONResponse(content={
+            "status": "success",
+            "rewritten_text": result,
+            "original_text": text
+        })
+        
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
+
+
+@router.get("/presets")
+async def get_presets():
+    """Get available preset prompts"""
+    return {
+        "presets": [
+            {"key": k, "label": v} for k, v in PRESET_PROMPTS.items()
+        ]
+    }
+
+
 @router.get("/health")
 async def edit_health():
     """Health check for edit service"""
@@ -130,3 +192,4 @@ async def edit_health():
         "status": "healthy",
         "service": "edit"
     }
+

@@ -65,9 +65,9 @@ async def process_image_to_csv_with_gemini(image_bytes: bytes) -> Dict:
         print("🤖 Stage 2: Reorganizing text with Gemini AI...")
         
         genai.configure(api_key=GOOGLE_API_KEY)
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-flash-latest')
         
-        # Enhanced prompt for text reorganization
+        # Enhanced prompt for text reorganization (STRICT: organize only, no interpretation)
         reorganization_prompt = f"""
 다음은 실험 보고서 이미지에서 추출한 원본 텍스트입니다.
 이 텍스트를 분석하여 **실험 데이터 테이블만** CSV 형식으로 재구성해 주세요.
@@ -75,7 +75,27 @@ async def process_image_to_csv_with_gemini(image_bytes: bytes) -> Dict:
 [추출된 원본 텍스트]
 {extracted_text}
 
-⚠️ 중요 지시사항:
+═══════════════════════════════════════════════════════════════
+🎯 **핵심 역할** (YOUR ONLY JOB)
+═══════════════════════════════════════════════════════════════
+- 당신의 역할은 오직 **데이터 정리/포맷팅**입니다
+- 흩어진 텍스트를 가독성 좋은 CSV 테이블로 **재배치**만 하세요
+- 데이터의 해석, 분석, 계산, 수정은 절대 하지 마세요
+- 원본에 있는 모든 숫자를 빠짐없이 추출하세요
+
+═══════════════════════════════════════════════════════════════
+🚫 **절대 금지** (DATA INTEGRITY - NEVER DO THIS)
+═══════════════════════════════════════════════════════════════
+- ❌ 숫자 해석/변환/계산/반올림 금지
+- ❌ 읽기 어려운 숫자 추측 금지 → "?" 표시
+- ❌ 원본에 없는 값 추가 금지
+- ❌ 소수점, 자릿수 변경 금지 (예: 0.050 → 0.05 변환 금지)
+- ❌ 누락된 값 추측/계산 금지 → 빈칸 유지
+- ❌ 단위 변환 금지 (예: cm → m 변환 금지)
+
+═══════════════════════════════════════════════════════════════
+📋 **추출 규칙**
+═══════════════════════════════════════════════════════════════
 
 1. **제외할 것** (개인정보):
    - 학번 (Student ID)
@@ -92,26 +112,20 @@ async def process_image_to_csv_with_gemini(image_bytes: bytes) -> Dict:
 3. **CSV 형식 규칙**:
    - 각 실험은 빈 줄로 구분
    - 첫 줄: 실험명 또는 컬럼 헤더
-   - 숫자는 정확히 (소수점 포함)
+   - 숫자는 원본 그대로 (소수점 포함)
    - 단위 유지 (0.05m처럼)
 
 4. **테이블 구조 인식**:
-    -실험명은 같으나 조건(예: Picket Fence Spacing 0.05m, 0.10m 등)이 다른 경우에는 다른 데이터 테이블로 인식
+   - 실험명은 같으나 조건이 다른 경우 → 별도 테이블로 분리
    - 행과 열을 명확히 구분
    - 반복 패턴을 찾아 테이블로 변환
-   - 3개의 Trial이 있으면 3x3 표 형식으로
 
 5. **출력 예시**:
 ```
 Experiment 1: Free Fall - Picket Fence Spacing 0.05m
-Trial_1,Time_1(s),Position_1(m),Time_2(s),Position_2(m),Time_3(s),Position_3(m)
-1,0.00,0.00,0.00,0.00,0.543,0.00
-2,0.05,0.05,0.05,0.05,0.589,0.05
-
-Experiment 1: Free Fall - Picket Fence Spacing 0.10m
-Trial_1,Time_1(s),Position_1(m),Time_2(s),Position_2(m),Time_3(s),Position_3(m)
-1,0.00,0.00,0.00,0.00,0.543,0.00
-2,0.05,0.05,0.05,0.05,0.589,0.05
+Trial,Time(s),Position(m)
+1,0.00,0.00
+2,0.05,0.05
 
 Experiment 2: Projectile Motion
 Angle,v(m/s)
@@ -120,7 +134,8 @@ Angle,v(m/s)
 ```
 
 위 규칙에 따라 원본 텍스트를 정리된 CSV로 변환해 주세요.
-설명 없이 CSV 데이터만 출력하세요.
+⚠️ 설명 없이 CSV 데이터만 출력하세요.
+⚠️ 숫자는 절대 수정하지 마세요. 원본 그대로 출력하세요.
 """
         
         # Generate structured CSV

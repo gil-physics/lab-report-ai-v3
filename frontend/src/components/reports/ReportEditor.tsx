@@ -74,7 +74,15 @@ import { useAnalysis } from '../../context/AnalysisContext';
 import { cn } from '../../lib/utils';
 import { Commands, createSuggestionItems } from './commands';
 import CommandsList from './CommandsList';
-const Toolbar = ({ editor }: { editor: any }) => {
+import AIRewritePanel from './AIRewritePanel';
+import MathInputModal from './MathInputModal';
+
+interface ToolbarProps {
+    editor: any;
+    onOpenMathModal: () => void;
+}
+
+const Toolbar = ({ editor, onOpenMathModal }: ToolbarProps) => {
     if (!editor) return null;
 
     const btnClass = (active: boolean) => cn(
@@ -84,13 +92,6 @@ const Toolbar = ({ editor }: { editor: any }) => {
 
     const sectionClass = "flex flex-col gap-1 pb-3 mb-3 border-b border-slate-100 last:border-0 last:mb-0 last:pb-0";
 
-    const insertMath = (block = false) => {
-        const { from, to } = editor.state.selection;
-        const text = editor.state.doc.textBetween(from, to, ' ');
-        const wrapped = block ? `\n\n\$$ ${text} \$$\n\n` : `\$ ${text} \$`;
-        editor.chain().focus().insertContent(wrapped).run();
-    };
-
     return (
         <aside className="fixed top-1/2 -translate-y-1/2 right-6 z-50 no-print">
             <div className="flex flex-col p-2 bg-white/90 backdrop-blur-xl border border-slate-200 rounded-3xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] w-14">
@@ -99,7 +100,7 @@ const Toolbar = ({ editor }: { editor: any }) => {
                     <button onClick={() => editor.chain().focus().undo().run()} className={btnClass(false)} title="Undo (Ctrl+Z)">
                         <Undo2 size={18} />
                     </button>
-                    <button onClick={() => editor.chain().focus().redo().run()} className={btnClass(false)} title="Redo">
+                    <button onClick={() => editor.chain().focus().redo().run()} className={btnClass(false)} title="Redo (Ctrl+Y)">
                         <Redo2 size={18} />
                     </button>
                 </div>
@@ -119,10 +120,10 @@ const Toolbar = ({ editor }: { editor: any }) => {
 
                 {/* Basic Formatting */}
                 <div className={sectionClass}>
-                    <button onClick={() => editor.chain().focus().toggleBold().run()} className={btnClass(editor.isActive('bold'))} title="Bold">
+                    <button onClick={() => editor.chain().focus().toggleBold().run()} className={btnClass(editor.isActive('bold'))} title="Bold (Ctrl+B)">
                         <Bold size={18} />
                     </button>
-                    <button onClick={() => editor.chain().focus().toggleItalic().run()} className={btnClass(editor.isActive('italic'))} title="Italic">
+                    <button onClick={() => editor.chain().focus().toggleItalic().run()} className={btnClass(editor.isActive('italic'))} title="Italic (Ctrl+I)">
                         <Italic size={18} />
                     </button>
                     <button onClick={() => editor.chain().focus().toggleUnderline().run()} className={btnClass(editor.isActive('underline'))} title="Underline">
@@ -148,7 +149,7 @@ const Toolbar = ({ editor }: { editor: any }) => {
 
                 {/* Math / TeX */}
                 <div className={sectionClass}>
-                    <button onClick={() => insertMath(false)} className={btnClass(false)} title="TeX Math (Inline)">
+                    <button onClick={onOpenMathModal} className={btnClass(false)} title="수식 입력 (Ctrl+M)">
                         <Sigma size={18} className="text-blue-600" />
                     </button>
                     <button onClick={() => editor.chain().focus().toggleCodeBlock().run()} className={btnClass(editor.isActive('codeBlock'))} title="Code Block">
@@ -198,17 +199,54 @@ export default function ReportEditor() {
         setGeneratedMarkdown,
         resetAnalysis,
         isGeneratingReport,
-        generationProgress,
-        analysisStats,
-        plotUrl
+        generationProgress
     } = useAnalysis();
     const navigate = useNavigate();
     const [isZenMode, setIsZenMode] = useState(true);
-    const plotUrlRef = useRef<string | null>(plotUrl);
+    const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
+    const [selectedText, setSelectedText] = useState('');
+    const [isMathModalOpen, setIsMathModalOpen] = useState(false);
+
+    // Auto-save to localStorage every 30 seconds
+    const STORAGE_KEY = 'lab-report-ai-autosave';
+    useEffect(() => {
+        // Load saved content on mount
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved && !generatedMarkdown) {
+            const shouldRestore = window.confirm('저장된 보고서가 있습니다. 복구하시겠습니까?');
+            if (shouldRestore) {
+                setGeneratedMarkdown(saved);
+            } else {
+                localStorage.removeItem(STORAGE_KEY);
+            }
+        }
+    }, []);
 
     useEffect(() => {
-        plotUrlRef.current = plotUrl;
-    }, [plotUrl]);
+        if (!generatedMarkdown) return;
+        const timer = setInterval(() => {
+            localStorage.setItem(STORAGE_KEY, generatedMarkdown);
+        }, 30000); // 30 seconds
+        return () => clearInterval(timer);
+    }, [generatedMarkdown]);
+
+    // Keyboard shortcut for math modal (Ctrl+M)
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.ctrlKey && e.key === 'm') {
+                e.preventDefault();
+                setIsMathModalOpen(true);
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
+    // Units ref for slash commands
+    const unitsRef = useRef(units);
+    useEffect(() => {
+        unitsRef.current = units;
+    }, [units]);
 
     // 🛡️ Refresh Guard: Redirect ONLY if data is completely lost (e.g. refresh)
     useEffect(() => {
@@ -216,11 +254,6 @@ export default function ReportEditor() {
             navigate('/visualize', { replace: true });
         }
     }, [units.length, navigate]);
-
-    const statsRef = useRef(analysisStats);
-    useEffect(() => {
-        statsRef.current = analysisStats;
-    }, [analysisStats]);
 
     const extensions = useMemo(() => [
         StarterKit,
@@ -248,7 +281,7 @@ export default function ReportEditor() {
         }),
         Commands.configure({
             suggestion: {
-                items: createSuggestionItems(statsRef, plotUrlRef),
+                items: createSuggestionItems(unitsRef),
                 render: () => {
                     let component: any;
                     let popup: any;
@@ -367,7 +400,7 @@ export default function ReportEditor() {
 
                     {/* Report Content */}
                     <div className="relative">
-                        <Toolbar editor={editor} />
+                        <Toolbar editor={editor} onOpenMathModal={() => setIsMathModalOpen(true)} />
 
                         {(!generatedMarkdown && isGeneratingReport) ? (
                             <div className="flex flex-col items-center justify-center py-40 gap-6 animate-in fade-in duration-1000">
@@ -396,10 +429,12 @@ export default function ReportEditor() {
                     <div className="flex items-center gap-1 p-1 bg-slate-900 text-white rounded-xl shadow-2xl border border-slate-800 animate-in fade-in zoom-in-95">
                         <button
                             onClick={() => {
-                                editor.chain().focus().run();
-                                // Mock AI Rewrite: Just italicize and color for now to show feedback
-                                editor.chain().focus().toggleItalic().run();
-                                // Ideally this would trigger an async AI call 
+                                const { from, to } = editor.state.selection;
+                                const text = editor.state.doc.textBetween(from, to, ' ');
+                                if (text) {
+                                    setSelectedText(text);
+                                    setIsAIPanelOpen(true);
+                                }
                             }}
                             className="px-3 py-1.5 flex items-center gap-2 text-xs font-bold hover:bg-emerald-600 rounded-lg transition-colors"
                         >
@@ -423,6 +458,38 @@ export default function ReportEditor() {
                 </BubbleMenu>
             )}
 
+            {/* AI Rewrite Panel */}
+            <AIRewritePanel
+                isOpen={isAIPanelOpen}
+                onClose={() => setIsAIPanelOpen(false)}
+                selectedText={selectedText}
+                onApply={(newText) => {
+                    editor?.chain().focus().insertContent(newText).run();
+                }}
+            />
+
+            {/* Math Input Modal */}
+            <MathInputModal
+                isOpen={isMathModalOpen}
+                onClose={() => setIsMathModalOpen(false)}
+                onInsert={(latex, isBlock) => {
+                    // Insert as math node for proper rendering
+                    if (isBlock) {
+                        editor?.chain().focus()
+                            .insertContent([
+                                { type: 'paragraph' },
+                                { type: 'math', attrs: { latex } },
+                                { type: 'paragraph' },
+                            ])
+                            .run();
+                    } else {
+                        editor?.chain().focus()
+                            .insertContent({ type: 'math', attrs: { latex } })
+                            .run();
+                    }
+                }}
+            />
+
 
             {/* Zen Mode Toggle */}
             <div className="fixed bottom-10 left-10 no-print">
@@ -442,10 +509,38 @@ export default function ReportEditor() {
             <style>{`
                 @media print {
                     .no-print { display: none !important; }
-                    body { background: white !important; padding: 0 !important; }
-                    main { padding: 0 !important; margin: 0 !important; max-width: none !important; }
-                    .prose { max-width: none !important; }
-                    .bg-white { box-shadow: none !important; border: none !important; }
+                    body { 
+                        background: white !important; 
+                        padding: 0 !important; 
+                        margin: 0 !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    main { 
+                        padding: 0 !important; 
+                        margin: 0 !important; 
+                        max-width: 100% !important; 
+                        width: 100% !important;
+                    }
+                    .prose { 
+                        max-width: 100% !important; 
+                        width: 100% !important;
+                        font-size: 11pt !important;
+                    }
+                    .bg-white { 
+                        box-shadow: none !important; 
+                        border: none !important; 
+                        border-radius: 0 !important;
+                        padding: 1cm !important;
+                        margin: 0 !important;
+                        max-width: 100% !important;
+                    }
+                    @page {
+                        size: A4;
+                        margin: 1.5cm;
+                    }
+                    h1, h2, h3, h4 { page-break-after: avoid; }
+                    table, img { page-break-inside: avoid; }
                 }
                 .prose h1 { text-align: center; border-bottom: 2px solid #1e293b; padding-bottom: 0.5rem; margin-top: 2rem; }
                 .prose h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.25rem; margin-top: 1.5rem; }
