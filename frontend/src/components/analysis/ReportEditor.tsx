@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Wand2 } from 'lucide-react';
+import { getApiUrl } from '../../lib/api';
 
 export default function ReportEditor() {
     const [selectedText, setSelectedText] = useState<string>('');
@@ -20,7 +21,7 @@ export default function ReportEditor() {
 
         setIsProcessing(true);
         try {
-            const response = await fetch('http://localhost:8000/api/edit/modify', {
+            const response = await fetch(getApiUrl('/api/edit/modify'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

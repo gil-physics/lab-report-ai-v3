@@ -10,6 +10,7 @@ import Papa from 'papaparse';
 import { useAnalysis } from '../../context/AnalysisContext';
 import { analyzeTypeUniformity, detectParallelBlocks } from '../../lib/physicsKeywords';
 import { useNavigate } from 'react-router-dom';
+import { getApiUrl } from '../../lib/api';
 
 type SelectionMode = 'header' | 'data' | 'edit';
 
@@ -158,7 +159,7 @@ const SmartDropzone: React.FC = () => {
             const formData = new FormData();
             formData.append('file', imageFile);
 
-            const response = await fetch('http://localhost:8000/api/ocr/upload', {
+            const response = await fetch(getApiUrl('/api/ocr/upload'), {
                 method: 'POST',
                 body: formData
             });

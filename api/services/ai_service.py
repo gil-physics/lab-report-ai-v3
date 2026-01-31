@@ -13,7 +13,7 @@ async def generate_ai_content(exp_name, analysis, template_id, template_content=
     genai.configure(api_key=GOOGLE_API_KEY)
     
     try:
-        model = genai.GenerativeModel('gemini-flash-latest')
+        model = genai.GenerativeModel('gemini-pro-latest')
         
         # Build prompt using template if available
         template_context = ""
