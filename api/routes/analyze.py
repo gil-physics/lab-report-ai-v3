@@ -317,6 +317,16 @@ async def prepare_report_md(request: Request):
                 csv_raw_data = body.get('csv_raw_data', None)
                 
                 ai_content = await generate_ai_content(exp_name, analysis, template, processed_template, raw_data_summary, csv_raw_data)
+                
+                # 🖼️ AI 응답의 그래프 플레이스홀더를 실제 이미지로 치환
+                plot_url = f"{base_url}/plots/{plot_filename}"
+                res_url = f"{base_url}/plots/{res_filename}"
+                img_html = f'<img src="{plot_url}" width="600" align="center" />'
+                res_html = f'<img src="{res_url}" width="600" align="center" />'
+                
+                ai_content = ai_content.replace("{{GRAPH_REGRESSION}}", f"\n\n{img_html}\n\n")
+                ai_content = ai_content.replace("{{GRAPH_RESIDUAL}}", f"\n\n{res_html}\n\n")
+                
                 md_content.append(ai_content)
                 md_content.append("")  # Blank line after AI section
 

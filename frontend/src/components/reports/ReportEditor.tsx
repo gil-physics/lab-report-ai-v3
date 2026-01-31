@@ -263,6 +263,8 @@ export default function ReportEditor() {
         Mathematics.configure({
             katexOptions: {
                 throwOnError: false,
+                errorColor: 'transparent',
+                strict: false,
             },
         }),
         BubbleMenuExtension,

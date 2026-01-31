@@ -37,7 +37,7 @@ async def rewrite_text(text: str, prompt: str, context_before: str = "", context
     genai.configure(api_key=GOOGLE_API_KEY)
     
     try:
-        model = genai.GenerativeModel('gemini-flash-latest')
+        model = genai.GenerativeModel('gemini-3-pro-preview')
         
         context_section = ""
         if context_before or context_after:
@@ -85,7 +85,7 @@ async def generate_section(
     genai.configure(api_key=GOOGLE_API_KEY)
     
     try:
-        model = genai.GenerativeModel('gemini-flash-latest')
+        model = genai.GenerativeModel('gemini-3-pro-preview')
         
         ai_prompt = f"""당신은 물리학 실험 보고서 작성 전문가입니다.
 

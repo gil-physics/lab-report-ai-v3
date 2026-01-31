@@ -13,7 +13,7 @@ async def generate_ai_content(exp_name, analysis, template_id, template_content=
     genai.configure(api_key=GOOGLE_API_KEY)
     
     try:
-        model = genai.GenerativeModel('gemini-pro-latest')
+        model = genai.GenerativeModel('gemini-3-pro-preview')
         
         # Build prompt using template if available
         template_context = ""
@@ -97,31 +97,39 @@ async def generate_ai_content(exp_name, analysis, template_id, template_content=
 - **Chain of Thought (CoT):** 결과 분석 및 토의 섹션 작성 시, "데이터가 A 경향을 보이므로 이론값 B와 비교했을 때 C라는 결론이 도출된다"는 식의 논리적 추론 과정을 서술하십시오.
 - **Scientific Precision:** 제공된 유효숫자 기준({min_sig_figs} 자리)을 인지하고, 오차 범위(±)가 포함된 파라미터 값을 논의할 때 그 의미(정밀도, 정확도)를 해석하십시오. 단위({x_unit}, {y_unit})를 누락하지 마십시오.
 
-## 2. 서식 및 표기 규칙 (매우 중요)
-다음의 한국어 텍스트 처리 규칙 및 렌더링 가이드라인을 **반드시** 준수해야 합니다.
+## 2. 그래프 삽입 (IMPORTANT - 필수)
+보고서의 **결과 및 분석** 섹션에서 데이터 경향을 설명할 때, 아래 플레이스홀더를 **반드시** 포함하십시오:
+- `{{{{GRAPH_REGRESSION}}}}` : 회귀 분석 그래프 (데이터 경향 설명 직후에 배치)
+- `{{{{GRAPH_RESIDUAL}}}}` : 잔차 분석 그래프 (오차 분석 시 배치)
 
-- **수식 기호($) 중복 절대 금지 (Parser Error 방지):** 모든 수식은 단일 쌍의 기호로만 감싸야 합니다. 이미 `$ ... $` 형태인 텍스트를 다시 `$` 로 감싸는 행위(예: `$ $...$ $`)를 절대 금지 합니다. 특히 **Input Data 3번** 의 수식은 이미 완성된 LaTeX 형태이므로, 어떠한 기호도 추가하지 말고 **있는 그대로(Raw Text) 인용**하십시오.
-- **토큰 결합 및 공백 규칙:**
-  - **내부 공백 제거:** 수식 기호 바로 안쪽에는 공백이 없어야 합니다. (예: `$R^2$` (O), `$ R^2 $` (X))
-  - **외부 공백 필수:** 수식 기호(`$`)와 한글 조사 또는 단어 사이에는 **반드시 한 칸의 공백** 을 포함하십시오. 이는 텍스트 가독성과 서식 렌더링 최적화를 위함입니다. (예: "결과는 `$x$` 입니다." (O), "결과는`$x$`입니다." (X))
-- **강조 서식(Bold) 띄어쓰기:** `**단어**`의 앞이나 뒤에 한글 조사나 단어가 이어질 경우, 반드시 한 칸 띄우십시오. (예: "**뉴턴** 의 법칙")
-- **LaTeX 문법 및 스타일:**
-  - 모든 수학적 변수는 **이탤릭체**로 표기하며, 표준 LaTeX 문법을 따르십시오.
-  - **Display Mode:** 독립된 줄에 배치할 때는 `$$...$$` 를 사용하십시오.
-  - **Inline Mode:** 문장 중간에 삽입할 때는 `$ ... $` 를 사용하십시오.
+예시:
+```
+측정 결과, 시간에 따른 속도 변화는 선형적인 증가 경향을 보였다. 회귀 분석 결과...
 
-## 3. 보고서 구조 (Report Structure)
+{{{{GRAPH_REGRESSION}}}}
+
+위 그래프에서 확인할 수 있듯이, 결정계수 $R^2 = 0.9876$ 으로 높은 적합도를 보인다.
+잔차 분석을 통해 모델의 적합성을 추가로 검증하였다.
+
+{{{{GRAPH_RESIDUAL}}}}
+```
+
+## 3. 수식 작성
+수식은 $...$로 감싸세요. 단, 수식 내부에 $ 기호를 넣으면 에러가 납니다. 예: $R^2 = 0.98$ (O)
+
+## 4. 보고서 구조 (Report Structure)
 - **템플릿 우선 순위:** 제공된 [보고서 템플릿 구조]가 있다면, 해당 템플릿의 목차와 형식을 **절대적으로** 따르십시오. 템플릿에 `[내용을 입력하세요]`와 같은 플레이스홀더가 있다면 이를 분석 결과로 채워 넣으십시오.
 - **기본 구조 (템플릿 없을 시):**
     1. **서론 (Introduction):** 실험 목적과 배경 이론 소개.
     2. **실험 방법 (Methods):** 절차를 과거형으로 간결하게 기술.
-    3. **결과 및 분석 (Results & Analysis):** 제공된 분석 결과를 요약하고 주요 경향성 및 오차율을 서술.
-4. **토의 (Discussion):** 오차의 원인을 '계통 오차'와 '우연 오차'로 구분하여 분석. 장비의 한계, 환경적 요인 등을 구체적으로 서술.
+    3. **결과 및 분석 (Results & Analysis):** 제공된 분석 결과를 요약하고 주요 경향성 및 오차율을 서술. **그래프 플레이스홀더 필수 포함.**
+    4. **토의 (Discussion):** 오차의 원인을 '계통 오차'와 '우연 오차'로 구분하여 분석. 장비의 한계, 환경적 요인 등을 구체적으로 서술.
     5. **결론 (Conclusion):** 목적 달성 여부 요약.
 
 # Output Format (출력 형식)
 - 제공된 템플릿의 내용을 **그대로 유지**하면서, 플레이스홀더 부분만 당신의 전문적인 분석으로 교체하여 완성된 보고서를 출력하십시오.
-- **HTML 이미지 태그 보존 (IMPORTANT):** 템플릿 내에 포함된 `<img src="..." width="..." align="..." />` 와 같은 HTML 태그는 그래프를 출력하기 위한 중요한 코드입니다. 이를 **절대 삭제하거나 변경하지 말고 그대로 출력**에 포함하십시오.
+- **그래프 플레이스홀더 필수:** 결과 분석 섹션에 `{{{{GRAPH_REGRESSION}}}}` 과 `{{{{GRAPH_RESIDUAL}}}}` 를 반드시 포함하십시오. 시스템이 이를 실제 그래프 이미지로 치환합니다.
+- **HTML 이미지 태그 보존:** 템플릿 내에 포함된 `<img src="..." />` 태그는 **절대 삭제하거나 변경하지 말고 그대로** 출력에 포함하십시오.
 - **데이터 중심 분석:** 그래프 이미지를 직접 설명하려 하지 말고(예: "빨간 선이 보입니다"), 제공된 **수치 데이터(Input Data 3번)**인 결정계수, 기울기, 오차값 등을 바탕으로 현상을 논리적으로 해석하십시오.
 - 전체 출력은 Markdown 형식을 사용하십시오.
 - 주요 섹션은 `##` 또는 템플릿에 정의된 헤더 수준으로 구분하십시오.
@@ -143,7 +151,18 @@ async def generate_ai_content(exp_name, analysis, template_id, template_content=
             error_msg = "AI 응답이 비어있습니다. " + " | ".join(error_details) if error_details else "AI 응답이 생성되지 않았습니다."
             return error_msg
         
-        return response.text
+        # 🔧 후처리: 특수 달러 기호를 정규 $ (U+0024)로 치환
+        result_text = response.text
+        # 유니코드 특수 달러 기호들을 일반 $로 치환
+        dollar_variants = [
+            '\uFF04',  # Fullwidth Dollar Sign (＄)
+            '\uFE69',  # Small Dollar Sign (﹩)
+            '\U0001F4B2',  # Heavy Dollar Sign (💲)
+        ]
+        for variant in dollar_variants:
+            result_text = result_text.replace(variant, '$')
+        
+        return result_text
     except Exception as e:
         error_str = str(e)
         if "429" in error_str or "quota" in error_str.lower():
