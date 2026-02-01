@@ -31,23 +31,31 @@ def upload_plot_to_supabase(image_buffer: BytesIO, filename: str) -> str:
     Returns:
         Public URL of the uploaded image
     """
-    supabase = get_supabase_client()
-    
-    # Ensure buffer is at the start
-    image_buffer.seek(0)
-    image_bytes = image_buffer.read()
-    
-    # Upload to Supabase Storage
-    response = supabase.storage.from_(BUCKET_NAME).upload(
-        path=filename,
-        file=image_bytes,
-        file_options={"content-type": "image/png", "upsert": "true"}
-    )
-    
-    # Get public URL
-    public_url = supabase.storage.from_(BUCKET_NAME).get_public_url(filename)
-    
-    return public_url
+    try:
+        supabase = get_supabase_client()
+        
+        # Ensure buffer is at the start
+        image_buffer.seek(0)
+        image_bytes = image_buffer.read()
+        
+        print(f"DEBUG: Uploading {filename} to Supabase ({len(image_bytes)} bytes)")
+        
+        # Upload to Supabase Storage
+        response = supabase.storage.from_(BUCKET_NAME).upload(
+            path=filename,
+            file=image_bytes,
+            file_options={"content-type": "image/png", "upsert": "true"}
+        )
+        
+        # Get public URL
+        public_url = supabase.storage.from_(BUCKET_NAME).get_public_url(filename)
+        
+        print(f"DEBUG: Upload successful. URL: {public_url}")
+        return public_url
+        
+    except Exception as e:
+        print(f"ERROR: Supabase upload failed: {type(e).__name__}: {str(e)}")
+        raise
 
 
 def delete_plot_from_supabase(filename: str) -> bool:

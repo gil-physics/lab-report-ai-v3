@@ -5,14 +5,18 @@ import base64
 from io import BytesIO
 import platform
 
-# Font configuration
+# Font configuration with fallback for Docker/Linux environments
 system_os = platform.system()
-if system_os == "Windows":
-    plt.rcParams['font.family'] = 'Malgun Gothic'
-elif system_os == "Darwin":
-    plt.rcParams['font.family'] = 'AppleGothic'
-else:
-    plt.rcParams['font.family'] = 'NanumGothic'
+try:
+    if system_os == "Windows":
+        plt.rcParams['font.family'] = 'Malgun Gothic'
+    elif system_os == "Darwin":
+        plt.rcParams['font.family'] = 'AppleGothic'
+    else:
+        # Linux/Docker: try NanumGothic, fallback to DejaVu Sans
+        plt.rcParams['font.family'] = 'NanumGothic'
+except:
+    plt.rcParams['font.family'] = 'DejaVu Sans'
 plt.rcParams['axes.unicode_minus'] = False
 
 
