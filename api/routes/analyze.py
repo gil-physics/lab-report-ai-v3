@@ -13,7 +13,8 @@ from api.utils.physics_formulas import get_recommended_formulas
 from api.utils.outlier_detection import remove_outliers
 from api.services.ai_service import generate_ai_content
 from api.services.template_service import load_report_template
-from api.services.plot_service import generate_plot_base64, generate_residual_plot_base64, generate_plot_file, generate_residual_plot_file
+from api.services.plot_service import generate_plot_base64, generate_residual_plot_base64, generate_plot_buffer, generate_residual_plot_buffer
+from api.services.storage_service import upload_plot_to_supabase
 import uuid
 
 router = APIRouter()
@@ -102,20 +103,6 @@ async def analyze(request: Request):
         # LaTeX 수식 생성
         latex_equation = equation_to_latex(best_model['equation'], best_model['params'])
         
-        # 📈 그래프 이미지 파일 생성 및 저장 (URL 제공용)
-        plot_filename = f"graph_{uuid.uuid4()}.png"
-        plots_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "plots")
-        if not os.path.exists(plots_dir):
-            os.makedirs(plots_dir)
-            
-        plot_path = os.path.join(plots_dir, plot_filename)
-        # Determine base URL for static files (plots)
-        host = request.headers.get("host", "localhost:8000")
-        protocol = "https" if request.headers.get("x-forwarded-proto") == "https" else "http"
-        base_url = f"{protocol}://{host}"
-        
-        plot_url = f"{base_url}/plots/{plot_filename}"
-        
         return JSONResponse(content={
             "status": "success",
             "best_model": {
@@ -139,8 +126,7 @@ async def analyze(request: Request):
                 "original_count": int(original_count),
                 "used_count": int(len(x_data)),
                 "outliers_removed": int(outliers_removed)
-            },
-            "plot_url": plot_url
+            }
         })
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
@@ -166,11 +152,6 @@ async def prepare_report_md(request: Request):
         template_content = load_report_template(template)
         
         template_content = load_report_template(template)
-        
-        # Determine base URL for static files (plots)
-        host = request.headers.get("host", "localhost:8000")
-        protocol = "https" if request.headers.get("x-forwarded-proto") == "https" else "http"
-        base_url = f"{protocol}://{host}"
 
         md_content.append("## 1. 실험 결과 및 분석")
         
@@ -260,22 +241,21 @@ async def prepare_report_md(request: Request):
             y_range = item.get('y_range')
             is_log = item.get('is_log_scale', False)
 
-            # 🖼️ Generate Static Graph Files using Matplotlib (Quality over Speed)
+            # 🖼️ Generate plots and upload to Supabase Storage
             plot_filename = f"report_graph_{uuid.uuid4()}.png"
             res_filename = f"report_residual_{uuid.uuid4()}.png"
             
-            # Directory setup
-            plots_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "plots")
-            if not os.path.exists(plots_dir):
-                os.makedirs(plots_dir)
+            # Generate plot buffers
+            plot_buffer = generate_plot_buffer(x_vals, y_vals, y_pred_vals, x_label, y_label, f"{exp_name} 회귀 분석", x_range=x_range, y_range=y_range, is_log=is_log)
+            res_buffer = generate_residual_plot_buffer(x_vals, residuals_vals, x_label, y_label, f"{exp_name} 잔차 분석", x_range=x_range)
             
-            # Save files
-            generate_plot_file(x_vals, y_vals, os.path.join(plots_dir, plot_filename), y_pred_vals, x_label, y_label, f"{exp_name} 회귀 분석", x_range=x_range, y_range=y_range, is_log=is_log)
-            generate_residual_plot_file(x_vals, residuals_vals, os.path.join(plots_dir, res_filename), x_label, y_label, f"{exp_name} 잔차 분석", x_range=x_range)
+            # Upload to Supabase and get public URLs
+            plot_url = upload_plot_to_supabase(plot_buffer, plot_filename)
+            res_url = upload_plot_to_supabase(res_buffer, res_filename)
             
-            # Capture the first plot URL to return for context usage (e.g., Slash Commands)
+            # Capture the first plot URL to return for context usage
             if 'first_plot_url' not in locals():
-                first_plot_url = f"{base_url}/plots/{plot_filename}"
+                first_plot_url = plot_url
             
             # AI Discussion
             if use_ai:
@@ -295,10 +275,7 @@ async def prepare_report_md(request: Request):
                 # 🛠️ 템플릿 내 그래프 플레이스홀더를 실제 HTML 이미지 태그로 치환 (사이즈 조절 가능하도록)
                 processed_template = template_content
                 if processed_template:
-                    plot_url = f"{base_url}/plots/{plot_filename}"
-                    res_url = f"{base_url}/plots/{res_filename}"
-                    
-                    # HTML 이미지 태그 (사용자가 쉽게 수치 조절 가능)
+                    # HTML 이미지 태그 (Supabase 공개 URL 사용)
                     img_html = f'<img src="{plot_url}" width="600" align="center" />'
                     res_html = f'<img src="{res_url}" width="600" align="center" />'
                     
@@ -318,9 +295,7 @@ async def prepare_report_md(request: Request):
                 
                 ai_content = await generate_ai_content(exp_name, analysis, template, processed_template, raw_data_summary, csv_raw_data)
                 
-                # 🖼️ AI 응답의 그래프 플레이스홀더를 실제 이미지로 치환
-                plot_url = f"{base_url}/plots/{plot_filename}"
-                res_url = f"{base_url}/plots/{res_filename}"
+                # 🖼️ AI 응답의 그래프 플레이스홀더를 실제 이미지로 치환 (Supabase URL 사용)
                 img_html = f'<img src="{plot_url}" width="600" align="center" />'
                 res_html = f'<img src="{res_url}" width="600" align="center" />'
                 

@@ -104,7 +104,8 @@ sys.path.append(os.path.dirname(__file__))
 from utils.curve_fitting import smart_curve_fitting, equation_to_latex
 from utils.physics_formulas import get_recommended_formulas
 from utils.outlier_detection import remove_outliers
-from services.plot_service import generate_plot_file, generate_residual_plot_file
+from services.plot_service import generate_plot_buffer, generate_residual_plot_buffer
+from services.storage_service import upload_plot_to_supabase
 
 app = FastAPI(
     title="Easy-Lab-Plotter Analysis API",
@@ -356,11 +357,6 @@ async def prepare_report_md(request: Request):
             md_content.append(theory_part.strip())
             md_content.append("\n---\n")
 
-        # Determine base URL for static files (plots)
-        host = request.headers.get("host", "localhost:8000")
-        protocol = "https" if request.headers.get("x-forwarded-proto") == "https" else "http"
-        base_url = f"{protocol}://{host}"
-
         # Analysis Results Section
         md_content.append("## 1. 실험 결과 및 분석\n")
         
@@ -419,26 +415,25 @@ async def prepare_report_md(request: Request):
             
             md_content.append("\n")
             
-            # 🖼️ Generate Static Graph Files using Matplotlib (Quality over Speed)
+            # 🖼️ Generate plots and upload to Supabase Storage
             plot_filename = f"report_graph_{uuid.uuid4()}.png"
             res_filename = f"report_residual_{uuid.uuid4()}.png"
             
-            # Directory setup
-            plots_dir = os.path.join(os.path.dirname(__file__), "static", "plots")
-            if not os.path.exists(plots_dir):
-                os.makedirs(plots_dir)
+            # Generate plot buffers
+            plot_buffer = generate_plot_buffer(x_vals, y_vals, y_pred_vals, x_label, y_label, f"{exp_name} 회귀 분석")
+            res_buffer = generate_residual_plot_buffer(x_vals, residuals_vals, x_label, y_label, f"{exp_name} 잔차 분석")
             
-            # Save files
-            generate_plot_file(x_vals, y_vals, os.path.join(plots_dir, plot_filename), y_pred_vals, x_label, y_label, f"{exp_name} 회귀 분석")
-            generate_residual_plot_file(x_vals, residuals_vals, os.path.join(plots_dir, res_filename), x_label, y_label, f"{exp_name} 잔차 분석")
+            # Upload to Supabase and get public URLs
+            plot_url = upload_plot_to_supabase(plot_buffer, plot_filename)
+            res_url = upload_plot_to_supabase(res_buffer, res_filename)
             
-            # Markdown links
-            md_content.append(f"![{exp_name} 회귀 분석 그래프]({base_url}/plots/{plot_filename})\n")
-            md_content.append(f"![{exp_name} 잔차 그래프]({base_url}/plots/{res_filename})\n")
+            # Markdown links (using Supabase public URLs)
+            md_content.append(f"![{exp_name} 회귀 분석 그래프]({plot_url})\n")
+            md_content.append(f"![{exp_name} 잔차 그래프]({res_url})\n")
 
             # Capture the first plot URL to return for context usage
             if 'first_plot_url' not in locals():
-                first_plot_url = f"{base_url}/plots/{plot_filename}"
+                first_plot_url = plot_url
             
             # AI Discussion
             if use_ai:
