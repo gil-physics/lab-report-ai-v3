@@ -22,6 +22,9 @@ RUN pip install --no-cache-dir -r api/requirements.txt
 # Copy backend code
 COPY api/ ./api/
 
+# Copy report templates (needed for report generation)
+COPY report_templates/ ./report_templates/
+
 # Copy built frontend from Stage 1 to backend's static directory
 COPY --from=frontend-builder /app/frontend/dist ./api/static
 
