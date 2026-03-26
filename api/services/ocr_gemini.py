@@ -26,7 +26,7 @@ async def process_image_to_csv_with_gemini(image_bytes: bytes) -> Dict:
         print("🤖 Gemini Vision: Analyzing image and extracting data...")
         
         genai.configure(api_key=GOOGLE_API_KEY)
-        model = genai.GenerativeModel('gemini-3-pro-preview')
+        model = genai.GenerativeModel('gemini-3.1-pro-preview')
         
         # Load image from bytes
         img = Image.open(io.BytesIO(image_bytes))
@@ -75,6 +75,11 @@ Experiment 1: Free Fall - Picket Fence Spacing 0.05m
 Measurement,Time_1st(s),Position_1st(m),Time_2nd(s),Position_2nd(m),Time_3rd(s),Position_3rd(m)
 1,2.319,0.00,3.166,0.00,2.543,0.00
 2,2.376,0.05,3.222,0.05,2.599,0.05
+
+Experiment 1: Free Fall - Picket Fence Spacing 0.02m
+Measurement,Time_1st(s),Position_1st(m),Time_2nd(s),Position_2nd(m),Time_3rd(s),Position_3rd(m)
+1,2.219,0.00,3.166,0.00,2.543,0.00
+2,2.32,0.53,3.232,0.025,2.539,0.05
 
 Experiment 2: Projectile Motion
 Angle(deg),Range_1st(cm),Range_2nd(cm),Range_3rd(cm)

@@ -6,7 +6,7 @@
 @tailwind utilities;
 
 :root {
-  --primary-gradient: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+  --primary-gradient: linear-gradient(135deg, #2664e9 0%, #4f46e5 100%);
   /* Electric Science Blue to Indigo */
   --secondary-gradient: linear-gradient(135deg, #10b981 0%, #0ea5e9 100%);
   --surface-glass: rgba(255, 255, 255, 0.85);
