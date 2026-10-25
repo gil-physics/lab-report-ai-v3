@@ -122,7 +122,7 @@ export const createSuggestionItems = (unitsRef: MutableRefObject<AnalysisUnit[]>
         if (items.length === 0) {
             items.push({
                 title: 'No Data',
-                description: 'Step 2에서 데이터를 먼저 분석해주세요',
+                description: 'Step 2에서 데이터를 먼저 분석해 주십시오',
                 searchTerms: [],
                 command: () => { },
             });

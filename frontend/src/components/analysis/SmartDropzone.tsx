@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Upload, AlertCircle, FileSpreadsheet, Database,
     LayoutGrid, Plus, Trash2, ChevronRight,
-    Target, Flag, Play, MousePointer2, Camera, Pencil
+    Target, Flag, Play, MousePointer2, Camera, Pencil, FlaskConical
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { useAnalysis } from '../../context/AnalysisContext';
@@ -13,6 +13,8 @@ import { useNavigate } from 'react-router-dom';
 import { getApiUrl } from '../../lib/api';
 
 type SelectionMode = 'header' | 'data' | 'edit';
+
+const SAMPLE_FILE_NAME = 'sample_free_fall.csv';
 
 const SmartDropzone: React.FC = () => {
     const navigate = useNavigate();
@@ -24,6 +26,7 @@ const SmartDropzone: React.FC = () => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [processingMessage, setProcessingMessage] = useState<string>('');
+    const [isSample, setIsSample] = useState(false);
 
     // --- Slicing State (Active Selection) ---
     const [headerRow, setHeaderRow] = useState<number>(0);
@@ -91,10 +94,7 @@ const SmartDropzone: React.FC = () => {
         }
     }, [rawRows.length]);
 
-    const onDrop = useCallback(async (acceptedFiles: File[]) => {
-        const file = acceptedFiles[0];
-        if (!file) return;
-
+    const loadCsvFile = useCallback(async (file: File) => {
         setIsProcessing(true);
         setUploadStatus('idle');
 
@@ -139,6 +139,26 @@ const SmartDropzone: React.FC = () => {
         }
     }, [setFile, setRawRows, setCsvRawData]);
 
+    const onDrop = useCallback(async (acceptedFiles: File[]) => {
+        const file = acceptedFiles[0];
+        if (!file) return;
+        setIsSample(false);
+        await loadCsvFile(file);
+    }, [loadCsvFile]);
+
+    // 데이터가 없는 사용자를 위한 샘플 CSV (public/samples)
+    const loadSampleData = async () => {
+        try {
+            const res = await fetch(`${import.meta.env.BASE_URL}samples/${SAMPLE_FILE_NAME}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const blob = await res.blob();
+            setIsSample(true);
+            await loadCsvFile(new File([blob], SAMPLE_FILE_NAME, { type: 'text/csv' }));
+        } catch (err: any) {
+            alert(`샘플 데이터를 불러오지 못했습니다: ${err.message}`);
+        }
+    };
+
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
         accept: { 'text/csv': ['.csv'], 'application/vnd.ms-excel': ['.csv'] },
@@ -149,6 +169,7 @@ const SmartDropzone: React.FC = () => {
         const imageFile = acceptedFiles[0];
         if (!imageFile) return;
 
+        setIsSample(false);
         setIsProcessing(true);
         setUploadStatus('idle');
 
@@ -300,6 +321,12 @@ const SmartDropzone: React.FC = () => {
                             <ChevronRight size={14} />
                             <span className="text-blue-600">Unit Definition</span>
                         </div>
+                        {isSample && (
+                            <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-100 border border-amber-300 text-amber-700 text-xs font-black">
+                                <FlaskConical size={14} />
+                                샘플 데이터로 체험 중
+                            </span>
+                        )}
                     </div>
                     <div className="flex items-center space-x-4">
                         <button
@@ -311,7 +338,7 @@ const SmartDropzone: React.FC = () => {
                         <button
                             onClick={() => {
                                 if (units.length === 0) {
-                                    alert("분석할 실험 단위를 하나 이상 추가해주세요!");
+                                    alert("분석할 실험 단위를 하나 이상 추가해 주십시오.");
                                     return;
                                 }
                                 setActiveStep('analysis');
@@ -336,7 +363,7 @@ const SmartDropzone: React.FC = () => {
                                         📋 현재 선택 상태
                                     </h3>
                                     <span className="text-[10px] text-slate-400 font-medium">
-                                        {selectionMode === 'edit' ? '✏️ 편집 모드 - 셀을 클릭하여 수정' : '아래에서 모드를 선택하세요'}
+                                        {selectionMode === 'edit' ? '✏️ 편집 모드 - 셀을 클릭하여 수정' : '아래에서 모드를 선택하십시오'}
                                     </span>
                                 </div>
                                 <div className="grid grid-cols-3 gap-4">
@@ -369,9 +396,9 @@ const SmartDropzone: React.FC = () => {
                                         <span className="text-sm font-black text-slate-600">작업 모드</span>
                                     </div>
                                     <p className="text-xs text-slate-400 font-medium">
-                                        {selectionMode === 'header' && '헤더 행을 클릭하세요'}
-                                        {selectionMode === 'data' && '데이터 범위를 드래그하세요'}
-                                        {selectionMode === 'edit' && '수정할 셀을 클릭하세요'}
+                                        {selectionMode === 'header' && '헤더 행을 클릭하십시오'}
+                                        {selectionMode === 'data' && '데이터 범위를 드래그하십시오'}
+                                        {selectionMode === 'edit' && '수정할 셀을 클릭하십시오'}
                                     </p>
                                 </div>
                                 <div className="flex bg-white rounded-2xl border-2 border-slate-200 p-1.5 shadow-md">
@@ -643,7 +670,7 @@ const SmartDropzone: React.FC = () => {
         <div className="w-full max-w-5xl mx-auto py-12 flex flex-col items-center">
             <div className="text-center mb-10">
                 <h2 className="text-3xl font-black text-slate-800 mb-2">데이터 가져오기</h2>
-                <p className="text-slate-500 font-medium">컴퓨터에 저장된 파일이나 종이 실험지를 업로드하세요.</p>
+                <p className="text-slate-500 font-medium">컴퓨터에 저장된 파일이나 종이 실험지를 업로드하십시오.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
@@ -722,10 +749,43 @@ const SmartDropzone: React.FC = () => {
                     </motion.div>
                 </div>
             </div>
+
+            {/* Sample Data (for users without their own data) */}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 }}
+                className="w-full mt-8 rounded-[2rem] border-2 border-dashed border-amber-300 bg-amber-50/60 p-6 flex flex-col md:flex-row items-center gap-6"
+            >
+                <div className="w-14 h-14 shrink-0 bg-amber-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/30">
+                    <FlaskConical strokeWidth={2.5} size={26} />
+                </div>
+                <div className="flex-1 text-center md:text-left">
+                    <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
+                        <span className="px-2 py-0.5 bg-amber-500 text-white rounded-md text-[10px] font-black tracking-wider">SAMPLE</span>
+                        <h3 className="text-lg font-black text-slate-800">실험 데이터가 없으십니까?</h3>
+                    </div>
+                    <p className="text-sm text-slate-600 font-medium">
+                        샘플 데이터로 먼저 테스트해 보십시오. 업로드 없이 바로 전체 기능을 체험할 수 있습니다.
+                    </p>
+                    <p className="text-xs text-slate-400 font-medium mt-1">
+                        {SAMPLE_FILE_NAME} · 피켓펜스 자유낙하 (간격 0.05m / 0.04m, 3회 반복) + 포물체 운동
+                    </p>
+                </div>
+                <button
+                    onClick={loadSampleData}
+                    disabled={isProcessing}
+                    className="shrink-0 px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-black shadow-lg shadow-amber-500/30 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <Play size={16} fill="currentColor" />
+                    샘플로 체험하기
+                </button>
+            </motion.div>
         </div>
     );
 
     function resetWorkspace() {
+        setIsSample(false);
         setUploadStatus('idle');
         setFile(null);
         setRawRows([]);

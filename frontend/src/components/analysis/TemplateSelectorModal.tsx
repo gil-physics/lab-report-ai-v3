@@ -173,7 +173,7 @@ export default function TemplateSelectorModal({ isOpen, onOpenChange }: Template
                                         {step === 'category' ? '보고서 템플릿 선택' : '실험 주제 선택'}
                                     </Dialog.Title>
                                     <Dialog.Description className="text-xs text-slate-500">
-                                        {step === 'category' ? '원하시는 보고서의 형식을 선택해주세요.' : '진행하신 실험 주제를 선택해주세요.'}
+                                        {step === 'category' ? '원하시는 보고서의 형식을 선택해 주십시오.' : '진행하신 실험 주제를 선택해 주십시오.'}
                                     </Dialog.Description>
                                 </div>
                             </div>

@@ -76,7 +76,7 @@ export default function MathInputModal({ isOpen, onClose, onInsert }: MathInputM
                         </div>
                         <div>
                             <h2 className="font-black text-slate-800">수식 입력</h2>
-                            <p className="text-xs text-slate-500">LaTeX 문법으로 수식을 작성하세요</p>
+                            <p className="text-xs text-slate-500">LaTeX 문법으로 수식을 작성하십시오</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">

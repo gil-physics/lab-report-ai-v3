@@ -52,7 +52,7 @@ export default function ReportEditor() {
             <div className="max-w-4xl w-full space-y-6">
                 <div className="text-center mb-8">
                     <h2 className="text-2xl font-black text-slate-800">AI 보고서 편집기 (간단 버전)</h2>
-                    <p className="text-slate-500 mt-2">텍스트를 선택하고 AI로 수정 버튼을 클릭하세요</p>
+                    <p className="text-slate-500 mt-2">텍스트를 선택하고 AI로 수정 버튼을 클릭하십시오</p>
                 </div>
 
                 <div

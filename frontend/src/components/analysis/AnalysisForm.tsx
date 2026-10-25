@@ -173,7 +173,7 @@ const AnalysisForm: React.FC<AnalysisFormProps> = ({
                     <div className="space-y-3">
                         {derivedVariables.length === 0 ? (
                             <div className="flex flex-col items-center justify-center p-8 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-                                <p className="text-slate-400 text-sm font-medium">단위 변환이나 제곱($x^2$) 등의 파생 변수가 필요한가요?</p>
+                                <p className="text-slate-400 text-sm font-medium">단위 변환이나 제곱($x^2$) 등의 파생 변수가 필요하십니까?</p>
                             </div>
                         ) : (
                             derivedVariables.map((dv, idx) => (

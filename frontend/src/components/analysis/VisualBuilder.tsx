@@ -145,14 +145,14 @@ export default function VisualBuilder() {
                                 </div>
                             ) : (
                                 <div className="p-10 text-center">
-                                    <p className="text-xs font-bold text-slate-300 uppercase">그래프를 추가해주세요</p>
+                                    <p className="text-xs font-bold text-slate-300 uppercase">그래프를 추가해 주십시오</p>
                                 </div>
                             )}
                         </div>
                     ) : (
                         <div className="flex-1 flex flex-col items-center justify-center p-10 text-center space-y-4">
                             <Plus className="w-12 h-12 text-slate-200" />
-                            <p className="text-sm font-bold text-slate-400">분석할 유닛을 업로드 페이지에서 먼저 추가해주세요.</p>
+                            <p className="text-sm font-bold text-slate-400">분석할 유닛을 업로드 페이지에서 먼저 추가해 주십시오.</p>
                         </div>
                     )}
                 </Tabs.Root>

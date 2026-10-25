@@ -95,7 +95,7 @@ export default function AIRewritePanel({ isOpen, onClose, selectedText, onApply 
                     <div>
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">원본 텍스트</label>
                         <div className="bg-slate-50 rounded-xl p-4 text-sm text-slate-700 max-h-24 overflow-y-auto border border-slate-100">
-                            {selectedText || '텍스트를 선택해주세요'}
+                            {selectedText || '텍스트를 선택해 주십시오'}
                         </div>
                     </div>
 
