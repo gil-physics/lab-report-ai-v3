@@ -34,6 +34,23 @@ const PHYSICS_TOPICS = [
     { id: '학습보조', name: '학습 보조용' },
 ];
 
+// Cloud Run cuts requests at 300s; give up a little earlier with a clear message
+const REPORT_TIMEOUT_MS = 180000;
+
+function describeReportError(error: unknown): string {
+    if (axios.isAxiosError(error)) {
+        if (error.code === 'ECONNABORTED') {
+            return '응답 시간이 3분을 넘어 중단했습니다. AI 서버가 혼잡할 수 있으니 잠시 후 다시 시도하십시오.';
+        }
+        if (!error.response) {
+            return '서버에 연결하지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도하십시오.';
+        }
+        const message = (error.response.data as any)?.message;
+        return message ? `서버 오류: ${message}` : `서버 오류가 발생했습니다 (HTTP ${error.response.status}).`;
+    }
+    return error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+}
+
 interface TemplateSelectorModalProps {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
@@ -47,6 +64,9 @@ export default function TemplateSelectorModal({ isOpen, onOpenChange }: Template
         setGeneratedMarkdown,
         setIsGeneratingReport,
         setGenerationProgress,
+        setGenerationStartedAt,
+        setGenerationError,
+        setGenerationWarnings,
         setPlotUrl
     } = useAnalysis();
     const navigate = useNavigate();
@@ -63,8 +83,11 @@ export default function TemplateSelectorModal({ isOpen, onOpenChange }: Template
     const generateReport = async (templateId: string) => {
         // Prepare for background generation
         setGeneratedMarkdown('');
+        setGenerationError(null);
+        setGenerationWarnings([]);
+        setGenerationStartedAt(Date.now());
         setIsGeneratingReport(true);
-        setGenerationProgress('Analyzing experiment data...');
+        setGenerationProgress('실험 데이터 정리 중...');
 
         // Immediate UI feedback
         onOpenChange(false);
@@ -105,12 +128,19 @@ export default function TemplateSelectorModal({ isOpen, onOpenChange }: Template
                     const xKey = chart.xColumn;
                     const yKey = chart.yColumn;
 
+                    // Keep x/y aligned: drop a row unless both values are real numbers
+                    // (blank cells must not become 0, and x/y must not be filtered separately)
+                    const toNumber = (v: any) => (v === null || v === undefined || String(v).trim() === '') ? NaN : Number(v);
+                    const pairs = enrichedUnitData
+                        .map(d => [toNumber(d[xKey]), toNumber(d[yKey])])
+                        .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
+
                     items.push({
                         experiment_name: `${unit.name} - ${chart.name}`,
                         analysis: unit.backendAnalysis || {}, // Last cached analysis for this unit
                         data: {
-                            x: enrichedUnitData.map(d => Number(d[xKey])).filter(v => !isNaN(v)),
-                            y: enrichedUnitData.map(d => Number(d[yKey])).filter(v => !isNaN(v)),
+                            x: pairs.map(p => p[0]),
+                            y: pairs.map(p => p[1]),
                         },
                         x_label: xKey,
                         y_label: yKey,
@@ -126,29 +156,31 @@ export default function TemplateSelectorModal({ isOpen, onOpenChange }: Template
                 // ... (simplified fallback logic if needed)
             }
 
-            setGenerationProgress('AI is creating the report draft...');
+            setGenerationProgress('AI 고찰 작성 중...');
             const response = await axios.post(getApiUrl('/api/prepare-report-md'), {
                 template: templateId,
                 items: items,
                 use_ai: true
-            });
+            }, { timeout: REPORT_TIMEOUT_MS });
 
-            if (response.data.status === 'success') {
-                // Set the generated markdown directly (it now includes the graph URL)
-                setGeneratedMarkdown(response.data.markdown);
-
-                // Save the plot URL for the editor commands
-                if (response.data.plot_url) {
-                    setPlotUrl(response.data.plot_url);
-                }
-
-                setGenerationProgress('Report generation complete! Please check it.');
-
-                // Slight delay to ensure context updates before navigation (handled by NavigationControls)
+            if (response.data.status !== 'success') {
+                throw new Error(response.data.message || '서버가 보고서를 반환하지 않았습니다.');
             }
+
+            // Set the generated markdown directly (it now includes the graph URL)
+            setGeneratedMarkdown(response.data.markdown);
+            setGenerationWarnings(response.data.ai_warnings || []);
+
+            // Save the plot URL for the editor commands
+            if (response.data.plot_url) {
+                setPlotUrl(response.data.plot_url);
+            }
+
+            setGenerationProgress('보고서 생성 완료');
         } catch (error) {
             console.error('Report generation failed:', error);
-            setGenerationProgress('Error: Failed to generate report.');
+            setGenerationError(describeReportError(error));
+            setGenerationProgress('');
         } finally {
             setIsGeneratingReport(false);
         }

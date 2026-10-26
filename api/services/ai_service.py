@@ -167,6 +167,20 @@ async def generate_ai_content(exp_name, analysis, template_id, template_content=
     except Exception as e:
         error_str = str(e)
         if "429" in error_str or "quota" in error_str.lower():
-            return "AI 생성 할당량(Quota)을 초과했습니다. 무료 티어의 일일 제한에 도달한 것 같습니다. 잠시 후 다시 시도하거나 내일 다시 이용해 주세요."
+            return "AI 생성 할당량(Quota)을 초과했습니다. 무료 티어의 일일 제한에 도달한 것 같습니다. 잠시 후 다시 시도하거나 내일 다시 이용해 주십시오."
         return f"AI 내용 생성 중 오류 발생: {error_str}"
+
+
+# Messages generate_ai_content returns instead of a report when the AI call fails
+AI_ERROR_PREFIXES = (
+    "AI API 키가 설정되지 않아",
+    "AI 응답이 비어있습니다",
+    "AI 응답이 생성되지 않았습니다",
+    "AI 생성 할당량(Quota)",
+    "AI 내용 생성 중 오류 발생",
+)
+
+
+def is_ai_error(text: str) -> bool:
+    return text.strip().startswith(AI_ERROR_PREFIXES)
 

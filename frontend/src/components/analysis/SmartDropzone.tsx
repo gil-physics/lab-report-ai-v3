@@ -16,6 +16,20 @@ type SelectionMode = 'header' | 'data' | 'edit';
 
 const SAMPLE_FILE_NAME = 'sample_free_fall.csv';
 
+const isNumericRow = (row: any[]) => {
+    const cells = row.filter(c => c !== null && c !== undefined && String(c).trim() !== '');
+    return cells.length > 0 && cells.every(c => typeof c === 'number' && Number.isFinite(c));
+};
+
+// Default data range: from the first data row down to the last row of that numeric block
+// (stops at a blank line or a second table's text header instead of running to the end of the file)
+const findNumericBlockEnd = (rows: any[][], start: number) => {
+    if (!rows[start] || !isNumericRow(rows[start])) return rows.length - 1;
+    let end = start;
+    while (end + 1 < rows.length && isNumericRow(rows[end + 1])) end++;
+    return end;
+};
+
 const SmartDropzone: React.FC = () => {
     const navigate = useNavigate();
     const {
@@ -87,7 +101,7 @@ const SmartDropzone: React.FC = () => {
 
             setHeaderRow(headerCandidate);
             setDataStart(dataStartCandidate);
-            setDataEnd(rawRows.length - 1);
+            setDataEnd(findNumericBlockEnd(rawRows, dataStartCandidate));
             setSuggestedBlocks(splits);
 
             if (splits.length > 0) {

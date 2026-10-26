@@ -60,8 +60,7 @@ import {
     Quote,
     Trash2,
     Code,
-    Loader2,
-    Beaker,
+    AlertTriangle,
     AlignLeft,
     AlignCenter,
     AlignRight,
@@ -74,6 +73,7 @@ import { useAnalysis } from '../../context/AnalysisContext';
 import { cn } from '../../lib/utils';
 import { Commands, createSuggestionItems } from './commands';
 import CommandsList from './CommandsList';
+import ReportGenerationStatus from './ReportGenerationStatus';
 import AIRewritePanel from './AIRewritePanel';
 import MathInputModal from './MathInputModal';
 
@@ -199,7 +199,8 @@ export default function ReportEditor() {
         setGeneratedMarkdown,
         resetAnalysis,
         isGeneratingReport,
-        generationProgress
+        generationError,
+        generationWarnings
     } = useAnalysis();
     const navigate = useNavigate();
     const [isZenMode, setIsZenMode] = useState(true);
@@ -367,6 +368,8 @@ export default function ReportEditor() {
 
     if (!editor) return null;
 
+    const showGenerationStatus = !generatedMarkdown && (isGeneratingReport || !!generationError);
+
     return (
         <div className={cn(
             "relative h-screen h-dvh flex flex-col transition-all duration-700 bg-[#f8fafc] overflow-hidden",
@@ -402,22 +405,20 @@ export default function ReportEditor() {
 
                     {/* Report Content */}
                     <div className="relative">
-                        <Toolbar editor={editor} onOpenMathModal={() => setIsMathModalOpen(true)} />
+                        {!showGenerationStatus && <Toolbar editor={editor} onOpenMathModal={() => setIsMathModalOpen(true)} />}
 
-                        {(!generatedMarkdown && isGeneratingReport) ? (
-                            <div className="flex flex-col items-center justify-center py-40 gap-6 animate-in fade-in duration-1000">
-                                <div className="relative">
-                                    <Beaker className="w-16 h-16 text-emerald-600/20" />
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
-                                    </div>
-                                    <Sparkles className="absolute -top-1 -right-1 w-6 h-6 text-emerald-400 animate-pulse" />
-                                </div>
-                                <div className="text-center space-y-2">
-                                    <h3 className="font-bold text-slate-900">AI is writing the report...</h3>
-                                    <p className="text-sm text-slate-500">{generationProgress}</p>
+                        {generatedMarkdown && generationWarnings.length > 0 && (
+                            <div className="no-print mb-6 flex gap-3 p-4 rounded-xl border border-amber-300 bg-amber-50 text-amber-800">
+                                <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+                                <div className="text-sm space-y-1">
+                                    <p className="font-bold">AI 고찰 작성에 실패해 일부 내용이 비어 있습니다.</p>
+                                    <p className="break-keep">{generationWarnings[0]}</p>
+                                    <p className="text-xs text-amber-700">그래프 단계에서 "보고서 생성"을 눌러 다시 시도할 수 있습니다.</p>
                                 </div>
                             </div>
+                        )}
+                        {showGenerationStatus ? (
+                            <ReportGenerationStatus />
                         ) : (
                             <EditorContent editor={editor} className="min-h-[29.7cm]" />
                         )}

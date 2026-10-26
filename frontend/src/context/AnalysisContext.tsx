@@ -53,6 +53,12 @@ interface AnalysisContextType {
     setIsGeneratingReport: (isGenerating: boolean) => void;
     generationProgress: string;
     setGenerationProgress: (progress: string) => void;
+    generationStartedAt: number | null;
+    setGenerationStartedAt: (time: number | null) => void;
+    generationError: string | null;
+    setGenerationError: (error: string | null) => void;
+    generationWarnings: string[];
+    setGenerationWarnings: (warnings: string[]) => void;
     plotUrl: string;
     setPlotUrl: (url: string) => void;
     isAnalyzing: boolean;
@@ -78,6 +84,9 @@ export const AnalysisProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [generatedMarkdown, setGeneratedMarkdown] = useState<string>('');
     const [isGeneratingReport, setIsGeneratingReport] = useState<boolean>(false);
     const [generationProgress, setGenerationProgress] = useState<string>('');
+    const [generationStartedAt, setGenerationStartedAt] = useState<number | null>(null);
+    const [generationError, setGenerationError] = useState<string | null>(null);
+    const [generationWarnings, setGenerationWarnings] = useState<string[]>([]);
     const [plotUrl, setPlotUrl] = useState<string>('');
     const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
 
@@ -271,6 +280,8 @@ export const AnalysisProvider: React.FC<{ children: ReactNode }> = ({ children }
         setSavedAnalyses([]);
         setGeneratedMarkdown('');
         setIsGeneratingReport(false);
+        setGenerationError(null);
+        setGenerationWarnings([]);
         setActiveStep('upload');
     };
 
@@ -294,6 +305,9 @@ export const AnalysisProvider: React.FC<{ children: ReactNode }> = ({ children }
                 generatedMarkdown, setGeneratedMarkdown,
                 isGeneratingReport, setIsGeneratingReport,
                 generationProgress, setGenerationProgress,
+                generationStartedAt, setGenerationStartedAt,
+                generationError, setGenerationError,
+                generationWarnings, setGenerationWarnings,
                 plotUrl, setPlotUrl,
                 isAnalyzing,
                 resetAnalysis

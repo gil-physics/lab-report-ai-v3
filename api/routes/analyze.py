@@ -11,13 +11,26 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from api.utils.curve_fitting import smart_curve_fitting, equation_to_latex
 from api.utils.physics_formulas import get_recommended_formulas
 from api.utils.outlier_detection import remove_outliers
-from api.services.ai_service import generate_ai_content
+from api.services.ai_service import generate_ai_content, is_ai_error
 from api.services.template_service import load_report_template
 from api.services.plot_service import generate_plot_base64, generate_residual_plot_base64, generate_plot_buffer, generate_residual_plot_buffer
 from api.services.storage_service import upload_plot_to_supabase
+import traceback
 import uuid
 
 router = APIRouter()
+
+NOT_ENOUGH_DATA_MESSAGE = "숫자 데이터 쌍이 2개 이상 필요합니다. 1단계에서 데이터 범위에 빈 행이나 글자가 섞여 있지 않은지 확인하십시오."
+
+
+def clean_xy(x_values, y_values):
+    """Convert to float (None, '', text → NaN) and keep only pairs where both x and y are finite."""
+    x = pd.to_numeric(pd.Series(list(x_values), dtype=object), errors="coerce").to_numpy(dtype=float)
+    y = pd.to_numeric(pd.Series(list(y_values), dtype=object), errors="coerce").to_numpy(dtype=float)
+    n = min(len(x), len(y))
+    x, y = x[:n], y[:n]
+    mask = np.isfinite(x) & np.isfinite(y)
+    return x[mask], y[mask]
 
 @router.get("/analyze")
 async def analyze_get():
@@ -36,8 +49,8 @@ async def analyze(request: Request):
         data = body.get("data", {})
         options = body.get("options", {})
         
-        x_data = np.array(data.get("x", []))
-        y_data = np.array(data.get("y", []))
+        x_data = data.get("x", [])
+        y_data = data.get("y", [])
         raw_x = data.get("raw_x", [])
         raw_y = data.get("raw_y", [])
         x_unit = data.get("x_unit", "")
@@ -48,7 +61,12 @@ async def analyze(request: Request):
         
         if len(x_data) != len(y_data):
             return JSONResponse(status_code=400, content={"status": "error", "message": "X and Y data must have the same length"})
-        
+
+        # Drop blank / non-numeric rows (e.g. empty lines or a second header inside the selected range)
+        x_data, y_data = clean_xy(x_data, y_data)
+        if len(x_data) < 2:
+            return JSONResponse(status_code=400, content={"status": "error", "message": NOT_ENOUGH_DATA_MESSAGE})
+
         # 유효숫자 계산 (Least Precise Rule)
         from api.utils.significant_figures import count_sig_figs, format_with_uncertainty
         
@@ -129,6 +147,7 @@ async def analyze(request: Request):
             }
         })
     except Exception as e:
+        traceback.print_exc()
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 @router.post("/prepare-report-md")
@@ -154,7 +173,10 @@ async def prepare_report_md(request: Request):
         template_content = load_report_template(template)
 
         md_content.append("## 1. 실험 결과 및 분석")
-        
+
+        reported_items = 0
+        ai_warnings = []
+
         for idx, item in enumerate(items):
             exp_name = item.get('experiment_name', f'실험 {idx+1}')
             data = item.get('data', {})
@@ -165,14 +187,8 @@ async def prepare_report_md(request: Request):
             raw_x = item.get('raw_x', [])
             raw_y = item.get('raw_y', [])
             
-            # Regression Data (Raw)
-            x_vals = np.array(data.get('x', []), dtype=float)
-            y_vals = np.array(data.get('y', []), dtype=float)
-            
-            # Remove NaNs if any (prevent calculation failure)
-            mask = ~np.isnan(x_vals) & ~np.isnan(y_vals)
-            x_vals = x_vals[mask]
-            y_vals = y_vals[mask]
+            # Regression Data (Raw) - keep only valid numeric (x, y) pairs
+            x_vals, y_vals = clean_xy(data.get('x', []), data.get('y', []))
 
             if len(x_vals) < 2:
                 continue
@@ -209,6 +225,7 @@ async def prepare_report_md(request: Request):
             y_pred_vals = analysis['func'](x_vals, *analysis['params'])
             residuals_vals = y_vals - y_pred_vals
             
+            reported_items += 1
             md_content.append(f"### 1.{idx+1}. {exp_name}")
             md_content.append("")  # Blank line before table
             
@@ -294,7 +311,9 @@ async def prepare_report_md(request: Request):
                 csv_raw_data = body.get('csv_raw_data', None)
                 
                 ai_content = await generate_ai_content(exp_name, analysis, template, processed_template, raw_data_summary, csv_raw_data)
-                
+                if is_ai_error(ai_content):
+                    ai_warnings.append(ai_content.strip())
+
                 # 🖼️ AI 응답의 그래프 플레이스홀더를 실제 이미지로 치환 (Supabase URL 사용)
                 img_html = f'<img src="{plot_url}" width="600" align="center" />'
                 res_html = f'<img src="{res_url}" width="600" align="center" />'
@@ -305,15 +324,20 @@ async def prepare_report_md(request: Request):
                 md_content.append(ai_content)
                 md_content.append("")  # Blank line after AI section
 
+        if reported_items == 0:
+            return JSONResponse(status_code=400, content={"status": "error", "message": NOT_ENOUGH_DATA_MESSAGE})
+
         final_markdown = "\n\n".join(md_content)
         print(f"DEBUG: Report generated successfully. Total length: {len(final_markdown)} chars")
-        
+
         return JSONResponse(content={
-            "status": "success", 
+            "status": "success",
             "markdown": final_markdown,
-            "plot_url": locals().get('first_plot_url', None)
+            "plot_url": locals().get('first_plot_url', None),
+            "ai_warnings": ai_warnings
         })
     except Exception as e:
+        traceback.print_exc()
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 @router.get("/health")
