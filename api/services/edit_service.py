@@ -4,6 +4,7 @@ Combines simple rewrite and context-aware generation/modification
 """
 import os
 import google.generativeai as genai
+from api.services.gemini_config import get_gemini_model_name
 
 
 
@@ -37,7 +38,7 @@ async def rewrite_text(text: str, prompt: str, context_before: str = "", context
     genai.configure(api_key=GOOGLE_API_KEY)
     
     try:
-        model = genai.GenerativeModel('gemini-3.1-pro-preview')
+        model = genai.GenerativeModel(get_gemini_model_name())
         
         context_section = ""
         if context_before or context_after:
@@ -85,7 +86,7 @@ async def generate_section(
     genai.configure(api_key=GOOGLE_API_KEY)
     
     try:
-        model = genai.GenerativeModel('gemini-3.1-pro-preview')
+        model = genai.GenerativeModel(get_gemini_model_name())
         
         ai_prompt = f"""당신은 물리학 실험 보고서 작성 전문가입니다.
 

@@ -1,5 +1,6 @@
 import os
 import google.generativeai as genai
+from api.services.gemini_config import get_gemini_model_name
 import re
 
 
@@ -13,7 +14,7 @@ async def generate_ai_content(exp_name, analysis, template_id, template_content=
     genai.configure(api_key=GOOGLE_API_KEY)
     
     try:
-        model = genai.GenerativeModel('gemini-3.1-pro-preview')
+        model = genai.GenerativeModel(get_gemini_model_name())
         
         # Build prompt using template if available
         template_context = ""

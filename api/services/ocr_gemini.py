@@ -6,6 +6,7 @@ import os
 import io
 from typing import Dict
 import google.generativeai as genai
+from api.services.gemini_config import get_gemini_model_name
 from PIL import Image
 
 
@@ -26,7 +27,7 @@ async def process_image_to_csv_with_gemini(image_bytes: bytes) -> Dict:
         print("🤖 Gemini Vision: Analyzing image and extracting data...")
         
         genai.configure(api_key=GOOGLE_API_KEY)
-        model = genai.GenerativeModel('gemini-3.1-pro-preview')
+        model = genai.GenerativeModel(get_gemini_model_name())
         
         # Load image from bytes
         img = Image.open(io.BytesIO(image_bytes))
