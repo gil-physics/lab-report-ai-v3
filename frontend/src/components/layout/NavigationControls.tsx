@@ -116,7 +116,7 @@ export default function NavigationControls() {
                         ) : (
                             <>
                                 <span className={cn(canProceed() ? "text-blue-600" : "text-slate-300")}>
-                                    {isGeneratingReport ? 'Generating...' : (currentStep === 2 && generatedMarkdown.length > 50 ? 'View Report' : 'Next Step')}
+                                    {isGeneratingReport ? '생성 중...' : currentStep === 2 ? (generatedMarkdown.length > 50 ? '보고서 보기' : '보고서 생성') : 'Next Step'}
                                 </span>
                                 {!isGeneratingReport && <ArrowRight size={18} className={cn("ml-2 transition-transform", canProceed() && "group-hover:translate-x-1", canProceed() ? "text-blue-600" : "text-slate-300")} />}
                             </>

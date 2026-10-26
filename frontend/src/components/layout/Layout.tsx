@@ -5,7 +5,7 @@ import FloatingProgressIndicator from './FloatingProgressIndicator';
 
 export default function Layout() {
     return (
-        <div className="h-screen flex flex-col bg-[#f8fafc] overflow-hidden">
+        <div className="h-screen h-dvh flex flex-col bg-[#f8fafc] overflow-hidden">
             <Header />
 
             <main className="flex-1 relative overflow-y-auto">

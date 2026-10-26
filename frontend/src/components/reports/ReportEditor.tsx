@@ -369,7 +369,7 @@ export default function ReportEditor() {
 
     return (
         <div className={cn(
-            "relative h-screen flex flex-col transition-all duration-700 bg-[#f8fafc] overflow-hidden",
+            "relative h-screen h-dvh flex flex-col transition-all duration-700 bg-[#f8fafc] overflow-hidden",
             isZenMode ? "items-center" : "items-stretch"
         )}>
             {/* Zen Editor Container */}
