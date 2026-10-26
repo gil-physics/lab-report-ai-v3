@@ -670,10 +670,34 @@ const SmartDropzone: React.FC = () => {
         <div className="w-full max-w-5xl mx-auto py-12 flex flex-col items-center">
             <div className="text-center mb-10">
                 <h2 className="text-3xl font-black text-slate-800 mb-2">데이터 가져오기</h2>
-                <p className="text-slate-500 font-medium">컴퓨터에 저장된 파일이나 종이 실험지를 업로드하십시오.</p>
+                <p className="text-slate-500 font-medium">샘플 데이터로 먼저 체험하거나, 컴퓨터에 저장된 파일이나 종이 실험지를 업로드하십시오.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+                {/* Sample Data (for users without their own data) */}
+                <motion.button
+                    type="button"
+                    onClick={loadSampleData}
+                    disabled={isProcessing}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    whileHover={{ scale: 1.02, y: -5 }}
+                    className="h-full relative overflow-hidden rounded-[2.5rem] border-2 border-dashed border-amber-300 bg-amber-50/60 hover:border-amber-400 cursor-pointer flex flex-col items-center justify-center p-8 text-center transition-all duration-500 shadow-2xl shadow-transparent hover:shadow-amber-500/10 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <span className="absolute top-5 right-6 px-2 py-0.5 bg-amber-500 text-white rounded-md text-[10px] font-black tracking-wider">SAMPLE</span>
+                    <div className="w-16 h-16 bg-amber-500 text-white rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-xl shadow-amber-500/30">
+                        <FlaskConical strokeWidth={2.5} size={28} />
+                    </div>
+                    <h3 className="text-xl font-black text-slate-800 mb-2">샘플 데이터로 체험</h3>
+                    <p className="text-sm text-slate-600 font-medium mb-1">실험 데이터가 없으십니까?</p>
+                    <p className="text-sm text-slate-500 font-medium mb-6">자유낙하 샘플로 먼저 테스트해 보십시오.</p>
+                    <span className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-black shadow-lg shadow-amber-500/30">
+                        <Play size={14} fill="currentColor" />
+                        샘플로 체험하기
+                    </span>
+                    <p className="text-[10px] text-slate-400 font-medium mt-4">{SAMPLE_FILE_NAME}</p>
+                </motion.button>
+
                 {/* CSV Upload */}
                 <div {...getRootProps()} className="outline-none h-full">
                     <input {...getInputProps()} />
@@ -683,7 +707,7 @@ const SmartDropzone: React.FC = () => {
                         whileHover={{ scale: 1.02, y: -5 }}
                         className={`
                             h-full relative overflow-hidden rounded-[2.5rem] border-3 border-dashed cursor-pointer
-                            flex flex-col items-center justify-center p-12 text-center
+                            flex flex-col items-center justify-center p-8 text-center
                             transition-all duration-500 shadow-2xl shadow-transparent hover:shadow-blue-500/10
                             ${isDragActive ? 'border-blue-500 bg-blue-50/50' : 'border-slate-200 bg-white hover:border-blue-300'}
                         `}
@@ -720,7 +744,7 @@ const SmartDropzone: React.FC = () => {
                         whileHover={{ scale: 1.02, y: -5 }}
                         className={`
                             h-full relative overflow-hidden rounded-[2.5rem] border-3 border-dashed cursor-pointer
-                            flex flex-col items-center justify-center p-12 text-center
+                            flex flex-col items-center justify-center p-8 text-center
                             transition-all duration-500 shadow-2xl shadow-transparent hover:shadow-emerald-500/10
                             ${isImageActive ? 'border-emerald-500 bg-emerald-50/50' : 'border-slate-200 bg-white hover:border-emerald-300'}
                         `}
@@ -749,38 +773,6 @@ const SmartDropzone: React.FC = () => {
                     </motion.div>
                 </div>
             </div>
-
-            {/* Sample Data (for users without their own data) */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 }}
-                className="w-full mt-8 rounded-[2rem] border-2 border-dashed border-amber-300 bg-amber-50/60 p-6 flex flex-col md:flex-row items-center gap-6"
-            >
-                <div className="w-14 h-14 shrink-0 bg-amber-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/30">
-                    <FlaskConical strokeWidth={2.5} size={26} />
-                </div>
-                <div className="flex-1 text-center md:text-left">
-                    <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
-                        <span className="px-2 py-0.5 bg-amber-500 text-white rounded-md text-[10px] font-black tracking-wider">SAMPLE</span>
-                        <h3 className="text-lg font-black text-slate-800">실험 데이터가 없으십니까?</h3>
-                    </div>
-                    <p className="text-sm text-slate-600 font-medium">
-                        샘플 데이터로 먼저 테스트해 보십시오. 업로드 없이 바로 전체 기능을 체험할 수 있습니다.
-                    </p>
-                    <p className="text-xs text-slate-400 font-medium mt-1">
-                        {SAMPLE_FILE_NAME} · 피켓펜스 자유낙하 (간격 0.05m / 0.04m, 3회 반복) + 포물체 운동
-                    </p>
-                </div>
-                <button
-                    onClick={loadSampleData}
-                    disabled={isProcessing}
-                    className="shrink-0 px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-black shadow-lg shadow-amber-500/30 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <Play size={16} fill="currentColor" />
-                    샘플로 체험하기
-                </button>
-            </motion.div>
         </div>
     );
 

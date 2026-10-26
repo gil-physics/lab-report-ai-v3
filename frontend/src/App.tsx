@@ -7,7 +7,7 @@ import ReportEditor from './components/reports/ReportEditor';
 function UploadStep() {
   return (
     <div className="h-full p-8 max-w-7xl mx-auto w-full">
-      <div className="max-w-xl mx-auto mt-20">
+      <div className="max-w-5xl mx-auto mt-12">
         <SmartDropzone />
       </div>
     </div>
