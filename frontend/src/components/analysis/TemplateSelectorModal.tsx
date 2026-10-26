@@ -158,10 +158,10 @@ export default function TemplateSelectorModal({ isOpen, onOpenChange }: Template
         <Dialog.Root open={isOpen} onOpenChange={onOpenChange}>
             <Dialog.Portal>
                 <Dialog.Overlay className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-[100] animate-in fade-in duration-300" />
-                <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl bg-white rounded-2xl shadow-2xl z-[101] overflow-hidden animate-in zoom-in-95 duration-300">
-                    <div className="flex flex-col h-[600px]">
+                <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-2xl bg-white rounded-2xl shadow-2xl z-[101] overflow-hidden animate-in zoom-in-95 duration-300">
+                    <div className="flex flex-col h-[min(600px,85vh)]">
                         {/* Header */}
-                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                        <div className="px-4 md:px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                             <div className="flex items-center gap-3">
                                 {step === 'topic' && (
                                     <button onClick={() => setStep('category')} className="p-2 hover:bg-white rounded-lg transition-colors">
@@ -183,7 +183,7 @@ export default function TemplateSelectorModal({ isOpen, onOpenChange }: Template
                         </div>
 
                         {/* Content */}
-                        <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
+                        <div className="flex-1 overflow-y-auto p-4 md:p-6 scrollbar-hide">
                             {step === 'category' ? (
                                 <div className="grid gap-4">
                                     {CATEGORIES.map((cat) => {
@@ -192,9 +192,9 @@ export default function TemplateSelectorModal({ isOpen, onOpenChange }: Template
                                             <button
                                                 key={cat.id}
                                                 onClick={() => handleCategorySelect(cat.id)}
-                                                className="flex items-center gap-6 p-6 rounded-2xl border-2 border-slate-100 hover:border-blue-500 hover:bg-blue-50/30 transition-all text-left group"
+                                                className="flex items-center gap-4 md:gap-6 p-4 md:p-6 rounded-2xl border-2 border-slate-100 hover:border-blue-500 hover:bg-blue-50/30 transition-all text-left group"
                                             >
-                                                <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                                                <div className="w-12 h-12 md:w-14 md:h-14 shrink-0 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all">
                                                     <Icon size={28} />
                                                 </div>
                                                 <div className="flex-1">
@@ -207,7 +207,7 @@ export default function TemplateSelectorModal({ isOpen, onOpenChange }: Template
                                     })}
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-2 gap-3 pb-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-4">
                                     {PHYSICS_TOPICS.map((topic) => (
                                         <button
                                             key={topic.id}

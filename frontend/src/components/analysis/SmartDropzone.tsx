@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -40,6 +40,12 @@ const SmartDropzone: React.FC = () => {
     // --- Drag Interaction State ---
     const [isDragging, setIsDragging] = useState(false);
     const [dragAnchor, setDragAnchor] = useState<number | null>(null);
+    const [touchAnchor, setTouchAnchor] = useState<number | null>(null);
+    const lastPointerTypeRef = useRef<string>('mouse');
+
+    useEffect(() => {
+        setTouchAnchor(null);
+    }, [selectionMode]);
 
     // --- Cell Editing State ---
     const [editingCell, setEditingCell] = useState<{ row: number; col: number } | null>(null);
@@ -309,29 +315,30 @@ const SmartDropzone: React.FC = () => {
         return (
             <div className="fixed inset-0 bg-slate-50 flex flex-col z-[100] animate-in fade-in duration-500 overflow-hidden">
                 {/* 1. Global Header */}
-                <header className="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between shadow-sm z-20">
-                    <div className="flex items-center space-x-4">
-                        <div className="bg-blue-600 text-white p-2 rounded-xl">
+                <header className="min-h-16 bg-white border-b border-slate-200 px-3 md:px-8 py-2 md:py-0 flex flex-wrap items-center justify-between gap-2 shadow-sm z-20">
+                    <div className="flex items-center space-x-2 md:space-x-4 min-w-0">
+                        <div className="bg-blue-600 text-white p-2 rounded-xl shrink-0">
                             <FileSpreadsheet size={20} />
                         </div>
-                        <h1 className="font-black text-slate-800 tracking-tight">지능형 실험단위 추출기</h1>
-                        <span className="text-slate-300">|</span>
-                        <div className="flex items-center space-x-2 text-sm font-bold text-slate-500">
+                        <h1 className="font-black text-slate-800 tracking-tight text-sm md:text-base whitespace-nowrap">지능형 실험단위 추출기</h1>
+                        <span className="hidden md:inline text-slate-300">|</span>
+                        <div className="hidden md:flex items-center space-x-2 text-sm font-bold text-slate-500">
                             <span className="bg-slate-100 px-3 py-1 rounded-lg">Row Slicing</span>
                             <ChevronRight size={14} />
                             <span className="text-blue-600">Unit Definition</span>
                         </div>
                         {isSample && (
-                            <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-100 border border-amber-300 text-amber-700 text-xs font-black">
+                            <span className="flex items-center gap-1.5 px-2 md:px-3 py-1 rounded-lg bg-amber-100 border border-amber-300 text-amber-700 text-xs font-black whitespace-nowrap">
                                 <FlaskConical size={14} />
-                                샘플 데이터로 체험 중
+                                <span className="hidden sm:inline">샘플 데이터로 체험 중</span>
+                                <span className="sm:hidden">샘플</span>
                             </span>
                         )}
                     </div>
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-3 md:space-x-4 ml-auto">
                         <button
                             onClick={resetWorkspace}
-                            className="text-slate-400 hover:text-slate-600 transition-colors"
+                            className="text-sm md:text-base text-slate-400 hover:text-slate-600 transition-colors whitespace-nowrap"
                         >
                             파일 다시 올리기
                         </button>
@@ -344,7 +351,7 @@ const SmartDropzone: React.FC = () => {
                                 setActiveStep('analysis');
                                 navigate('/visualize');
                             }}
-                            className={`btn-primary px-8 py-2.5 rounded-xl shadow-lg transition-all font-black flex items-center space-x-2 ${units.length === 0 ? 'opacity-50 grayscale cursor-not-allowed' : 'shadow-blue-500/20 active:scale-95'}`}
+                            className={`btn-primary px-4 md:px-8 py-2 md:py-2.5 text-sm md:text-base rounded-xl shadow-lg transition-all font-black flex items-center space-x-2 whitespace-nowrap ${units.length === 0 ? 'opacity-50 grayscale cursor-not-allowed' : 'shadow-blue-500/20 active:scale-95'}`}
                         >
                             <span>{units.length}개 유닛 분석 시작</span>
                             <Play size={16} fill="currentColor" />
@@ -352,73 +359,78 @@ const SmartDropzone: React.FC = () => {
                     </div>
                 </header>
 
-                <main className="flex-1 flex overflow-hidden">
+                <main className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden">
                     {/* 2. Left Side: Interactive Grid (Playground) */}
-                    <div className="flex-1 flex flex-col overflow-hidden bg-white border-r border-slate-200">
-                        <div className="p-4 bg-gradient-to-r from-slate-50 to-blue-50/30 border-b border-slate-200 flex flex-col space-y-4">
+                    <div className="flex-none h-[75vh] md:h-auto md:flex-1 flex flex-col overflow-hidden bg-white border-b md:border-b-0 md:border-r border-slate-200">
+                        <div className="p-3 md:p-4 bg-gradient-to-r from-slate-50 to-blue-50/30 border-b border-slate-200 flex flex-col space-y-3 md:space-y-4">
                             {/* Selection Status Summary Panel */}
-                            <div className="bg-white rounded-2xl border-2 border-blue-100 p-4 shadow-sm">
-                                <div className="flex items-center justify-between mb-3">
+                            <div className="bg-white rounded-2xl border-2 border-blue-100 p-3 md:p-4 shadow-sm">
+                                <div className="flex items-center justify-between mb-2 md:mb-3">
                                     <h3 className="text-xs font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
                                         📋 현재 선택 상태
                                     </h3>
-                                    <span className="text-[10px] text-slate-400 font-medium">
+                                    <span className="hidden sm:inline text-[10px] text-slate-400 font-medium">
                                         {selectionMode === 'edit' ? '✏️ 편집 모드 - 셀을 클릭하여 수정' : '아래에서 모드를 선택하십시오'}
                                     </span>
                                 </div>
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
+                                <div className="grid grid-cols-3 gap-2 md:gap-4">
+                                    <div className="bg-blue-50 rounded-xl p-2 md:p-3 border border-blue-200">
                                         <div className="text-[10px] font-black text-blue-400 uppercase mb-1 flex items-center gap-1">
                                             <Database size={12} /> 헤더 행
                                         </div>
-                                        <div className="text-lg font-black text-blue-600">Row {headerRow + 1}</div>
+                                        <div className="text-sm md:text-lg font-black text-blue-600">Row {headerRow + 1}</div>
                                     </div>
-                                    <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-200">
+                                    <div className="bg-emerald-50 rounded-xl p-2 md:p-3 border border-emerald-200">
                                         <div className="text-[10px] font-black text-emerald-400 uppercase mb-1 flex items-center gap-1">
                                             <Flag size={12} /> 데이터 범위
                                         </div>
-                                        <div className="text-lg font-black text-emerald-600">Row {dataStart + 1} ~ {dataEnd + 1}</div>
+                                        <div className="text-sm md:text-lg font-black text-emerald-600">Row {dataStart + 1} ~ {dataEnd + 1}</div>
                                     </div>
-                                    <div className="bg-purple-50 rounded-xl p-3 border border-purple-200">
+                                    <div className="bg-purple-50 rounded-xl p-2 md:p-3 border border-purple-200">
                                         <div className="text-[10px] font-black text-purple-400 uppercase mb-1 flex items-center gap-1">
                                             <LayoutGrid size={12} /> 열 범위
                                         </div>
-                                        <div className="text-lg font-black text-purple-600">Col {colRange[0] + 1} ~ {colRange[1] + 1}</div>
+                                        <div className="text-sm md:text-lg font-black text-purple-600">Col {colRange[0] + 1} ~ {colRange[1] + 1}</div>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Mode Selector - Enhanced */}
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-0">
                                 <div className="flex items-center space-x-4">
-                                    <div className="flex items-center space-x-2">
+                                    <div className="flex items-center space-x-2 shrink-0">
                                         <Target className="w-5 h-5 text-blue-500" />
                                         <span className="text-sm font-black text-slate-600">작업 모드</span>
                                     </div>
                                     <p className="text-xs text-slate-400 font-medium">
                                         {selectionMode === 'header' && '헤더 행을 클릭하십시오'}
-                                        {selectionMode === 'data' && '데이터 범위를 드래그하십시오'}
+                                        {selectionMode === 'data' && (touchAnchor !== null
+                                            ? <span className="text-emerald-600 font-bold">끝 행을 탭하십시오</span>
+                                            : <>
+                                                <span className="hidden md:inline">데이터 범위를 드래그하십시오</span>
+                                                <span className="md:hidden">시작 행과 끝 행을 차례로 탭하십시오</span>
+                                            </>)}
                                         {selectionMode === 'edit' && '수정할 셀을 클릭하십시오'}
                                     </p>
                                 </div>
-                                <div className="flex bg-white rounded-2xl border-2 border-slate-200 p-1.5 shadow-md">
+                                <div className="flex w-full md:w-auto bg-white rounded-2xl border-2 border-slate-200 p-1.5 shadow-md">
                                     <button
                                         onClick={() => setSelectionMode('header')}
-                                        className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center space-x-2 ${selectionMode === 'header' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                                        className={`flex-1 md:flex-none justify-center px-2 md:px-4 py-2 md:py-2.5 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 md:space-x-2 whitespace-nowrap ${selectionMode === 'header' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
                                     >
                                         <Database size={16} />
                                         <span>헤더 선택</span>
                                     </button>
                                     <button
                                         onClick={() => setSelectionMode('data')}
-                                        className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center space-x-2 ${selectionMode === 'data' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                                        className={`flex-1 md:flex-none justify-center px-2 md:px-4 py-2 md:py-2.5 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 md:space-x-2 whitespace-nowrap ${selectionMode === 'data' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
                                     >
                                         <MousePointer2 size={16} />
                                         <span>데이터 범위</span>
                                     </button>
                                     <button
                                         onClick={() => setSelectionMode('edit')}
-                                        className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center space-x-2 ${selectionMode === 'edit' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                                        className={`flex-1 md:flex-none justify-center px-2 md:px-4 py-2 md:py-2.5 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 md:space-x-2 whitespace-nowrap ${selectionMode === 'edit' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
                                     >
                                         <Pencil size={16} />
                                         <span>셀 편집</span>
@@ -427,9 +439,9 @@ const SmartDropzone: React.FC = () => {
                             </div>
 
                             {suggestedBlocks.length > 1 && (
-                                <div className="flex items-center space-x-3 py-2 border-t border-slate-100">
+                                <div className="flex flex-wrap items-center gap-2 md:gap-3 py-2 border-t border-slate-100">
                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Suggested Splits:</span>
-                                    <div className="flex items-center space-x-2">
+                                    <div className="flex flex-wrap items-center gap-2">
                                         {suggestedBlocks.map((block, idx) => (
                                             <button
                                                 key={idx}
@@ -464,6 +476,8 @@ const SmartDropzone: React.FC = () => {
                                         const isData = idx >= dataStart && idx <= dataEnd;
 
                                         const handleMouseDown = () => {
+                                            // Touch taps also emit compat mouse events; those are handled in handleTap
+                                            if (lastPointerTypeRef.current !== 'mouse') return;
                                             if (selectionMode === 'header') {
                                                 setHeaderRow(idx);
                                             } else if (selectionMode === 'data') {
@@ -490,9 +504,29 @@ const SmartDropzone: React.FC = () => {
                                             }
                                         };
 
+                                        // Touch: drag would scroll the table, so tap the start row, then the end row
+                                        const handleTap = (e: React.PointerEvent) => {
+                                            if (e.pointerType === 'mouse') return;
+                                            if (selectionMode === 'header') {
+                                                setHeaderRow(idx);
+                                            } else if (selectionMode === 'data') {
+                                                if (touchAnchor === null) {
+                                                    setTouchAnchor(idx);
+                                                    setDataStart(idx);
+                                                    setDataEnd(idx);
+                                                } else {
+                                                    setDataStart(Math.min(touchAnchor, idx));
+                                                    setDataEnd(Math.max(touchAnchor, idx));
+                                                    setTouchAnchor(null);
+                                                }
+                                            }
+                                        };
+
                                         return (
                                             <tr
                                                 key={idx}
+                                                onPointerDown={(e) => { lastPointerTypeRef.current = e.pointerType; }}
+                                                onPointerUp={handleTap}
                                                 onMouseDown={handleMouseDown}
                                                 onMouseEnter={handleMouseEnter}
                                                 onMouseUp={handleMouseUp}
@@ -583,7 +617,7 @@ const SmartDropzone: React.FC = () => {
                     </div>
 
                     {/* 3. Right Side: Analysis Queue Sidebar */}
-                    <div className="w-80 bg-white flex flex-col shadow-[-4px_0_15px_rgba(0,0,0,0.02)] z-10">
+                    <div className="w-full md:w-80 shrink-0 bg-white flex flex-col shadow-[-4px_0_15px_rgba(0,0,0,0.02)] z-10">
                         <div className="p-6 border-b border-slate-100">
                             <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center">
                                 <LayoutGrid size={16} className="mr-2 text-blue-500" />
@@ -667,13 +701,13 @@ const SmartDropzone: React.FC = () => {
 
 
     return (
-        <div className="w-full max-w-5xl mx-auto py-12 flex flex-col items-center">
-            <div className="text-center mb-10">
-                <h2 className="text-3xl font-black text-slate-800 mb-2">데이터 가져오기</h2>
+        <div className="w-full max-w-5xl mx-auto py-4 md:py-12 flex flex-col items-center">
+            <div className="text-center mb-6 md:mb-10">
+                <h2 className="text-2xl md:text-3xl font-black text-slate-800 mb-2">데이터 가져오기</h2>
                 <p className="text-slate-500 font-medium">샘플 데이터로 먼저 체험하거나, 컴퓨터에 저장된 파일이나 종이 실험지를 업로드하십시오.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 w-full">
                 {/* Sample Data (for users without their own data) */}
                 <motion.button
                     type="button"
@@ -682,7 +716,7 @@ const SmartDropzone: React.FC = () => {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     whileHover={{ scale: 1.02, y: -5 }}
-                    className="h-full relative overflow-hidden rounded-[2.5rem] border-2 border-dashed border-amber-300 bg-amber-50/60 hover:border-amber-400 cursor-pointer flex flex-col items-center justify-center p-8 text-center transition-all duration-500 shadow-2xl shadow-transparent hover:shadow-amber-500/10 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="h-full relative overflow-hidden rounded-[2.5rem] border-2 border-dashed border-amber-300 bg-amber-50/60 hover:border-amber-400 cursor-pointer flex flex-col items-center justify-center p-6 md:p-8 text-center transition-all duration-500 shadow-2xl shadow-transparent hover:shadow-amber-500/10 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <span className="absolute top-5 right-6 px-2 py-0.5 bg-amber-500 text-white rounded-md text-[10px] font-black tracking-wider">SAMPLE</span>
                     <div className="w-16 h-16 bg-amber-500 text-white rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-xl shadow-amber-500/30">
@@ -707,7 +741,7 @@ const SmartDropzone: React.FC = () => {
                         whileHover={{ scale: 1.02, y: -5 }}
                         className={`
                             h-full relative overflow-hidden rounded-[2.5rem] border-3 border-dashed cursor-pointer
-                            flex flex-col items-center justify-center p-8 text-center
+                            flex flex-col items-center justify-center p-6 md:p-8 text-center
                             transition-all duration-500 shadow-2xl shadow-transparent hover:shadow-blue-500/10
                             ${isDragActive ? 'border-blue-500 bg-blue-50/50' : 'border-slate-200 bg-white hover:border-blue-300'}
                         `}
@@ -744,7 +778,7 @@ const SmartDropzone: React.FC = () => {
                         whileHover={{ scale: 1.02, y: -5 }}
                         className={`
                             h-full relative overflow-hidden rounded-[2.5rem] border-3 border-dashed cursor-pointer
-                            flex flex-col items-center justify-center p-8 text-center
+                            flex flex-col items-center justify-center p-6 md:p-8 text-center
                             transition-all duration-500 shadow-2xl shadow-transparent hover:shadow-emerald-500/10
                             ${isImageActive ? 'border-emerald-500 bg-emerald-50/50' : 'border-slate-200 bg-white hover:border-emerald-300'}
                         `}

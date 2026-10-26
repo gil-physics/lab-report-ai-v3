@@ -67,19 +67,19 @@ export default function NavigationControls() {
     return (
         <>
             {/* Main Navigation Bar (Centered) */}
-            <div className="sticky bottom-6 mx-auto w-full max-w-2xl h-16 bg-white/80 backdrop-blur-md rounded-2xl border border-slate-200/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex items-center justify-between px-8 z-50 transition-all duration-300 no-print">
+            <div className="sticky bottom-3 md:bottom-6 mx-auto w-[calc(100%-1.5rem)] md:w-full max-w-2xl h-16 bg-white/80 backdrop-blur-md rounded-2xl border border-slate-200/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex items-center justify-between px-3 md:px-8 z-50 transition-all duration-300 no-print">
                 <button
                     onClick={handleBack}
                     disabled={currentStep === 1}
                     className={cn(
-                        "flex items-center px-4 py-2 rounded-xl text-sm font-semibold transition-all group",
+                        "flex items-center px-2 md:px-4 py-2 rounded-xl text-sm font-semibold transition-all group whitespace-nowrap",
                         currentStep === 1
                             ? "text-slate-200 cursor-not-allowed"
                             : "text-slate-500 hover:text-slate-900"
                     )}
                 >
                     <ArrowLeft size={18} className={cn("mr-2 transition-transform", currentStep !== 1 && "group-hover:-translate-x-1")} />
-                    {currentStep === 3 ? "Back to Chart" : "Back"}
+                    {currentStep === 3 ? <><span className="hidden sm:inline">Back to Chart</span><span className="sm:hidden">Back</span></> : "Back"}
                 </button>
 
                 <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-3">
@@ -90,7 +90,7 @@ export default function NavigationControls() {
                     {currentStep === 3 && (
                         <button
                             onClick={handlePrint}
-                            className="flex items-center px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                            className="flex items-center px-2 md:px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all"
                             title="Print or Save as PDF"
                         >
                             Print
@@ -100,7 +100,7 @@ export default function NavigationControls() {
                         onClick={currentStep === 3 ? handleExport : handleNext}
                         disabled={currentStep === 3 ? !generatedMarkdown : !canProceed()}
                         className={cn(
-                            "flex items-center px-6 py-2 rounded-xl text-sm font-bold transition-all duration-300 group relative",
+                            "flex items-center px-4 md:px-6 py-2 rounded-xl text-sm font-bold transition-all duration-300 group relative whitespace-nowrap",
                             currentStep === 3
                                 ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-95"
                                 : canProceed()
@@ -111,7 +111,7 @@ export default function NavigationControls() {
                         {currentStep === 3 ? (
                             <>
                                 <Save size={18} className="mr-2" />
-                                Download .md
+                                <span className="hidden sm:inline">Download&nbsp;</span>.md
                             </>
                         ) : (
                             <>
@@ -132,7 +132,7 @@ export default function NavigationControls() {
 
             {/* Separate Regenerate Button (Bottom Right) */}
             {currentStep === 2 && generatedMarkdown.length > 50 && (
-                <div className="fixed bottom-6 right-8 z-50">
+                <div className="fixed bottom-24 right-3 md:bottom-6 md:right-8 z-50">
                     <button
                         onClick={() => setIsTemplateModalOpen(true)}
                         className="flex items-center gap-2 px-5 py-3 rounded-xl bg-white/90 backdrop-blur text-sm font-bold text-violet-600 border border-violet-100 shadow-xl hover:bg-violet-50 hover:scale-105 active:scale-95 transition-all"

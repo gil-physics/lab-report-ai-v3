@@ -24,7 +24,7 @@ export default function ProgressStepper() {
     const currentStep = getCurrentStep();
 
     return (
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1 md:space-x-2">
             {steps.map((step, index) => {
                 const isActive = step.id === currentStep;
                 const isCompleted = step.id < currentStep;
@@ -36,7 +36,7 @@ export default function ProgressStepper() {
                         {index > 0 && (
                             <div
                                 className={cn(
-                                    "w-8 h-0.5 mx-2 rounded-full transition-colors duration-300",
+                                    "w-3 mx-0.5 md:w-8 md:mx-2 h-0.5 rounded-full transition-colors duration-300",
                                     step.id <= currentStep ? "bg-slate-300" : "bg-slate-100"
                                 )}
                             />
@@ -45,7 +45,7 @@ export default function ProgressStepper() {
                         {/* Step Bubble */}
                         <div
                             className={cn(
-                                "relative flex items-center px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300 cursor-pointer select-none",
+                                "relative flex items-center px-2 md:px-4 py-1.5 rounded-full whitespace-nowrap text-sm font-medium transition-all duration-300 cursor-pointer select-none",
                                 isActive
                                     ? cn(stepTheme.light, stepTheme.text, "ring-2 ring-offset-2", stepTheme.ring)
                                     : isCompleted
@@ -58,7 +58,7 @@ export default function ProgressStepper() {
                                 }
                             }}
                         >
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-1 md:space-x-2">
                                 <div className={cn(
                                     "flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold",
                                     isActive ? cn(stepTheme.primary, "text-white") :
@@ -66,7 +66,7 @@ export default function ProgressStepper() {
                                 )}>
                                     {isCompleted ? <Check size={12} strokeWidth={3} /> : step.id}
                                 </div>
-                                <span>{step.name}</span>
+                                <span className={cn(!isActive && "hidden md:inline")}>{step.name}</span>
                             </div>
 
                             {isActive && (

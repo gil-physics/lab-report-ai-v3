@@ -36,7 +36,7 @@ export default function VisualBuilder() {
     return (
         <div className="flex flex-col lg:flex-row h-full w-full overflow-hidden bg-slate-50/30">
             {/* Left Control Panel - Unit & Graph Config */}
-            <aside className="w-full lg:w-[320px] xl:w-[420px] h-1/2 lg:h-full flex-shrink-0 bg-white border-r border-slate-200 shadow-sm z-20 flex flex-col overflow-hidden">
+            <aside className="order-2 lg:order-none w-full lg:w-[320px] xl:w-[420px] h-1/2 lg:h-full flex-shrink-0 bg-white border-t lg:border-t-0 lg:border-r border-slate-200 shadow-sm z-20 flex flex-col overflow-hidden">
                 <Tabs.Root
                     value={activeUnitId || ''}
                     onValueChange={setActiveUnitId}
@@ -102,7 +102,7 @@ export default function VisualBuilder() {
                                                 {activeUnit.activeChartId === chart.id && <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />}
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); removeChart(activeUnit.id, chart.id); }}
-                                                    className="p-1 hover:bg-red-100 rounded text-slate-400 hover:text-red-500 transition-colors opacity-0 group-hover/chart:opacity-100"
+                                                    className="p-1 hover:bg-red-100 rounded text-slate-400 hover:text-red-500 transition-colors lg:opacity-0 lg:group-hover/chart:opacity-100"
                                                 >
                                                     <Trash2 size={12} />
                                                 </button>
@@ -159,10 +159,10 @@ export default function VisualBuilder() {
             </aside>
 
             {/* Right Content Area - Dynamic Graph & Analysis */}
-            <main className="flex-1 h-1/2 lg:h-full overflow-y-auto flex flex-col bg-slate-50/50 scroll-smooth">
+            <main className="order-1 lg:order-none flex-1 h-1/2 lg:h-full overflow-y-auto flex flex-col bg-slate-50/50 scroll-smooth">
                 {activeUnit ? (
-                    <div className="flex-1 p-6 lg:p-10 pb-24">
-                        <div className="max-w-6xl mx-auto flex flex-col gap-10">
+                    <div className="flex-1 p-4 sm:p-6 lg:p-10 pb-10 lg:pb-24">
+                        <div className="max-w-6xl mx-auto flex flex-col gap-6 lg:gap-10">
                             {/* Heading for Active Unit */}
                             <div className="flex items-center justify-between">
                                 <div>
@@ -173,7 +173,7 @@ export default function VisualBuilder() {
 
                             {activeChart && (
                                 <>
-                                    <section className="w-full flex-shrink-0 h-[450px] lg:h-[540px]">
+                                    <section className="w-full flex-shrink-0 h-[340px] sm:h-[450px] lg:h-[540px]">
                                         <LiveChartCanvas
                                             data={enrichedData}
                                             chartType={activeChart.chartType}
@@ -188,7 +188,7 @@ export default function VisualBuilder() {
                                         />
                                     </section>
 
-                                    <section className="w-full pb-20">
+                                    <section className="w-full pb-4 lg:pb-20">
                                         <AnalysisPanel />
                                     </section>
                                 </>

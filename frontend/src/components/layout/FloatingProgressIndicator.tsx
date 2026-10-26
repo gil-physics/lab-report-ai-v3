@@ -13,7 +13,7 @@ export default function FloatingProgressIndicator() {
                         initial={{ opacity: 0, y: -20, scale: 0.9 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -20, scale: 0.9 }}
-                        className="flex items-center gap-4 px-6 py-4 bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-blue-100 ring-4 ring-blue-50/50"
+                        className="flex items-center gap-4 px-4 md:px-6 py-3 md:py-4 w-max max-w-[calc(100vw-2rem)] bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-blue-100 ring-4 ring-blue-50/50"
                     >
                         <div className="relative">
                             <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />

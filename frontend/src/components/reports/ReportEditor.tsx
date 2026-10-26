@@ -86,15 +86,15 @@ const Toolbar = ({ editor, onOpenMathModal }: ToolbarProps) => {
     if (!editor) return null;
 
     const btnClass = (active: boolean) => cn(
-        "p-2.5 rounded-xl transition-all hover:bg-slate-100 flex items-center justify-center",
+        "p-2 md:p-2.5 shrink-0 rounded-xl transition-all hover:bg-slate-100 flex items-center justify-center",
         active ? "bg-emerald-50 text-emerald-600 shadow-sm border border-emerald-100" : "text-slate-500 border border-transparent"
     );
 
-    const sectionClass = "flex flex-col gap-1 pb-3 mb-3 border-b border-slate-100 last:border-0 last:mb-0 last:pb-0";
+    const sectionClass = "flex flex-row md:flex-col shrink-0 gap-1 pr-2 mr-2 border-r md:pr-0 md:mr-0 md:border-r-0 md:pb-3 md:mb-3 md:border-b border-slate-100 last:border-0 last:mr-0 last:pr-0 md:last:border-0 md:last:mb-0 md:last:pb-0";
 
     return (
-        <aside className="fixed top-1/2 -translate-y-1/2 right-6 z-50 no-print">
-            <div className="flex flex-col p-2 bg-white/90 backdrop-blur-xl border border-slate-200 rounded-3xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] w-14">
+        <aside className="fixed bottom-[5.5rem] left-2 right-2 md:bottom-auto md:left-auto md:top-1/2 md:-translate-y-1/2 md:right-6 z-50 no-print">
+            <div className="flex flex-row md:flex-col p-1.5 md:p-2 bg-white/90 backdrop-blur-xl border border-slate-200 rounded-2xl md:rounded-3xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] w-full md:w-14 overflow-x-auto md:overflow-visible">
                 {/* History */}
                 <div className={sectionClass}>
                     <button onClick={() => editor.chain().focus().undo().run()} className={btnClass(false)} title="Undo (Ctrl+Z)">
@@ -374,15 +374,15 @@ export default function ReportEditor() {
         )}>
             {/* Zen Editor Container */}
             <main className={cn(
-                "flex-1 w-full overflow-y-auto pt-20 pb-40 scroll-smooth custom-scroll no-scrollbar",
-                isZenMode ? "max-w-4xl" : "max-w-none px-10"
+                "flex-1 w-full overflow-y-auto pt-4 md:pt-20 pb-40 scroll-smooth custom-scroll no-scrollbar",
+                isZenMode ? "max-w-4xl px-2 md:px-0" : "max-w-none px-2 md:px-10"
             )}>
                 <div className={cn(
-                    "bg-white min-h-[29.7cm] shadow-2xl transition-all duration-500 rounded-px p-[2cm] relative mb-20",
+                    "bg-white min-h-[29.7cm] shadow-2xl transition-all duration-500 rounded-px p-4 md:p-[2cm] relative mb-20",
                     isZenMode ? "border-x border-slate-100" : "rounded-2xl"
                 )}>
                     {/* Header bar within document */}
-                    <div className="flex items-center justify-between mb-12 pb-6 border-b border-slate-100 no-print">
+                    <div className="flex items-center justify-between mb-6 md:mb-12 pb-4 md:pb-6 border-b border-slate-100 no-print">
                         <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white">
                                 <FileTextIcon size={18} />
@@ -494,7 +494,7 @@ export default function ReportEditor() {
 
 
             {/* Zen Mode Toggle */}
-            <div className="fixed bottom-10 left-10 no-print">
+            <div className="hidden md:block fixed bottom-10 left-10 no-print">
                 <button
                     onClick={() => setIsZenMode(!isZenMode)}
                     className={cn(
@@ -563,6 +563,7 @@ export default function ReportEditor() {
                 }
                 .Mathematics-node:hover { background: #f1f5f9; }
                 .katex-display { margin: 1em 0; overflow-x: auto; overflow-y: hidden; }
+                .prose pre { white-space: pre-wrap; overflow-wrap: anywhere; }
             `}</style>
         </div>
     );
