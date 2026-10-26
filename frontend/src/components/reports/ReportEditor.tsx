@@ -46,6 +46,9 @@ import {
     Strikethrough,
     Type,
     RotateCcw,
+    ArrowLeft,
+    Printer,
+    Download,
     Maximize2,
     FileText as FileTextIcon,
     Bold,
@@ -93,7 +96,7 @@ const Toolbar = ({ editor, onOpenMathModal }: ToolbarProps) => {
     const sectionClass = "flex flex-row md:flex-col shrink-0 gap-1 pr-2 mr-2 border-r md:pr-0 md:mr-0 md:border-r-0 md:pb-3 md:mb-3 md:border-b border-slate-100 last:border-0 last:mr-0 last:pr-0 md:last:border-0 md:last:mb-0 md:last:pb-0";
 
     return (
-        <aside className="fixed bottom-[5.5rem] left-2 right-2 md:bottom-auto md:left-auto md:top-1/2 md:-translate-y-1/2 md:right-6 z-50 no-print">
+        <aside className="sticky top-2 z-30 mb-4 md:mb-0 md:fixed md:top-1/2 md:-translate-y-1/2 md:right-6 md:z-50 no-print">
             <div className="flex flex-row md:flex-col p-1.5 md:p-2 bg-white/90 backdrop-blur-xl border border-slate-200 rounded-2xl md:rounded-3xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] w-full md:w-14 overflow-x-auto md:overflow-visible">
                 {/* History */}
                 <div className={sectionClass}>
@@ -370,6 +373,19 @@ export default function ReportEditor() {
 
     const showGenerationStatus = !generatedMarkdown && (isGeneratingReport || !!generationError);
 
+    const handleExport = () => {
+        if (!generatedMarkdown) return;
+        const blob = new Blob([generatedMarkdown], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Lab_Report_${new Date().toISOString().slice(0, 10)}.md`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
     return (
         <div className={cn(
             "relative h-screen h-dvh flex flex-col transition-all duration-700 bg-[#f8fafc] overflow-hidden",
@@ -377,7 +393,7 @@ export default function ReportEditor() {
         )}>
             {/* Zen Editor Container */}
             <main className={cn(
-                "flex-1 w-full overflow-y-auto pt-4 md:pt-20 pb-40 scroll-smooth custom-scroll no-scrollbar",
+                "flex-1 w-full overflow-y-auto pt-4 md:pt-20 pb-16 md:pb-40 scroll-smooth custom-scroll no-scrollbar",
                 isZenMode ? "max-w-4xl px-2 md:px-0" : "max-w-none px-2 md:px-10"
             )}>
                 <div className={cn(
@@ -385,14 +401,41 @@ export default function ReportEditor() {
                     isZenMode ? "border-x border-slate-100" : "rounded-2xl"
                 )}>
                     {/* Header bar within document */}
-                    <div className="flex items-center justify-between mb-6 md:mb-12 pb-4 md:pb-6 border-b border-slate-100 no-print">
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white">
-                                <FileTextIcon size={18} />
+                    <div className="flex items-center justify-between gap-2 mb-6 md:mb-12 pb-4 md:pb-6 border-b border-slate-100 no-print">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <button
+                                onClick={() => navigate('/visualize')}
+                                className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-bold text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all whitespace-nowrap"
+                            >
+                                <ArrowLeft size={16} />
+                                그래프
+                            </button>
+                            <div className="hidden sm:flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white">
+                                    <FileTextIcon size={18} />
+                                </div>
+                                <span className="font-bold text-slate-700">Lab Report AI</span>
                             </div>
-                            <span className="font-bold text-slate-700">Lab Report AI</span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 sm:gap-2">
+                            <button
+                                onClick={() => window.print()}
+                                disabled={!generatedMarkdown}
+                                className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                                title="인쇄 또는 PDF로 저장"
+                            >
+                                <Printer size={16} />
+                                인쇄
+                            </button>
+                            <button
+                                onClick={handleExport}
+                                disabled={!generatedMarkdown}
+                                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                                title="마크다운 파일로 저장"
+                            >
+                                <Download size={16} />
+                                .md 저장
+                            </button>
                             <button
                                 onClick={resetAnalysis}
                                 className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"

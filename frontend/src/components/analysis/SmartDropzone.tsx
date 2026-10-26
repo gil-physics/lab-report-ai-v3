@@ -33,14 +33,15 @@ const findNumericBlockEnd = (rows: any[][], start: number) => {
 const SmartDropzone: React.FC = () => {
     const navigate = useNavigate();
     const {
-        setFile, setRawRows, rawRows, setRawRowsStrings, rawRowsStrings, units, addUnit, removeUnit,
+        file, setFile, setRawRows, rawRows, setRawRowsStrings, rawRowsStrings, units, addUnit, removeUnit,
         setActiveStep, setCsvRawData
     } = useAnalysis();
 
     const [isProcessing, setIsProcessing] = useState(false);
-    const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>('idle');
+    // Coming back from Step 2 with data still loaded → reopen the range selection screen
+    const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>(() => rawRows.length > 0 ? 'success' : 'idle');
     const [processingMessage, setProcessingMessage] = useState<string>('');
-    const [isSample, setIsSample] = useState(false);
+    const [isSample, setIsSample] = useState(() => file?.name === SAMPLE_FILE_NAME);
 
     // --- Slicing State (Active Selection) ---
     const [headerRow, setHeaderRow] = useState<number>(0);
@@ -414,6 +415,34 @@ const SmartDropzone: React.FC = () => {
                                 </li>
                             </ol>
 
+                            {/* Mobile actions: in the page flow right under the guide (no fixed bar) */}
+                            <div className="md:hidden flex items-center gap-2">
+                                <button
+                                    onClick={handleAddUnit}
+                                    className={`flex-1 py-3 rounded-xl text-sm font-black flex items-center justify-center gap-1.5 active:scale-95 transition-all ${canStart ? 'bg-slate-800 text-white' : 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'}`}
+                                >
+                                    <Plus size={16} />
+                                    분석 대상으로 추가
+                                </button>
+                                <button
+                                    onClick={startAnalysis}
+                                    disabled={!canStart}
+                                    className={`flex-1 py-3 rounded-xl text-sm font-black flex items-center justify-center gap-1.5 transition-all ${canStart ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30 active:scale-95' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                                >
+                                    {canStart ? (
+                                        <>
+                                            {units.length}개 분석 시작
+                                            <Play size={14} fill="currentColor" />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Lock size={14} />
+                                            추가 후 진행 가능
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+
                             {/* Mode Selector - Enhanced */}
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-0">
                                 <div className="flex items-center space-x-4">
@@ -719,34 +748,6 @@ const SmartDropzone: React.FC = () => {
                         </div>
                     </div>
                 </main>
-
-                {/* Mobile Action Bar: always visible without scrolling */}
-                <div className="md:hidden flex items-center gap-2 px-3 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] bg-white border-t border-slate-200 shadow-[0_-4px_15px_rgba(0,0,0,0.05)] z-20">
-                    <button
-                        onClick={handleAddUnit}
-                        className={`flex-1 py-3 rounded-xl text-sm font-black flex items-center justify-center gap-1.5 active:scale-95 transition-all ${canStart ? 'bg-slate-800 text-white' : 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'}`}
-                    >
-                        <Plus size={16} />
-                        분석 대상으로 추가
-                    </button>
-                    <button
-                        onClick={startAnalysis}
-                        disabled={!canStart}
-                        className={`flex-1 py-3 rounded-xl text-sm font-black flex items-center justify-center gap-1.5 transition-all ${canStart ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30 active:scale-95' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
-                    >
-                        {canStart ? (
-                            <>
-                                {units.length}개 분석 시작
-                                <Play size={14} fill="currentColor" />
-                            </>
-                        ) : (
-                            <>
-                                <Lock size={14} />
-                                추가 후 진행 가능
-                            </>
-                        )}
-                    </button>
-                </div>
             </div>
         );
     }
@@ -758,6 +759,19 @@ const SmartDropzone: React.FC = () => {
                 <h2 className="text-2xl md:text-3xl font-black text-slate-800 mb-2">데이터 가져오기</h2>
                 <p className="text-slate-500 font-medium">샘플 데이터로 먼저 체험하거나, 컴퓨터에 저장된 파일이나 종이 실험지를 업로드하십시오.</p>
             </div>
+
+            {canStart && (
+                <div className="w-full mb-6 rounded-2xl border-2 border-blue-200 bg-blue-50/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <p className="text-sm font-bold text-slate-700">이전에 추가한 분석 대상 {units.length}개가 남아 있습니다.</p>
+                    <button
+                        onClick={startAnalysis}
+                        className="flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-black shadow-lg shadow-blue-500/25 active:scale-95 transition-all whitespace-nowrap"
+                    >
+                        그래프 분석으로 이동
+                        <ChevronRight size={16} />
+                    </button>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 w-full">
                 {/* Sample Data (for users without their own data) */}

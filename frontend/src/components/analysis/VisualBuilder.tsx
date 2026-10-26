@@ -1,11 +1,12 @@
 import { useAnalysis } from '../../context/AnalysisContext';
 import * as Tabs from '@radix-ui/react-tabs';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, ArrowRight, Sparkles, Loader2, RefreshCw } from 'lucide-react';
 import ChartControlPanel from './ChartControlPanel';
 import LiveChartCanvas from './LiveChartCanvas';
 import AnalysisPanel from './AnalysisPanel';
+import TemplateSelectorModal from './TemplateSelectorModal';
 import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '../../lib/utils';
 
 export default function VisualBuilder() {
@@ -20,9 +21,47 @@ export default function VisualBuilder() {
         removeChart,
         updateChart,
         setActiveChartId,
-        updateUnit
+        updateUnit,
+        generatedMarkdown,
+        isGeneratingReport
     } = useAnalysis();
     const navigate = useNavigate();
+    const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+    const hasReport = generatedMarkdown.length > 50;
+
+    // Report actions live in the page itself (not a floating bar) so they are visible on every phone browser
+    const handleReportClick = () => {
+        if (isGeneratingReport || hasReport) navigate('/report');
+        else setIsTemplateModalOpen(true);
+    };
+
+    const reportButton = (className?: string) => (
+        <button
+            onClick={handleReportClick}
+            className={cn(
+                "flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-black shadow-lg shadow-blue-500/25 active:scale-95 transition-all whitespace-nowrap",
+                className
+            )}
+        >
+            {isGeneratingReport ? (
+                <>
+                    <Loader2 size={16} className="animate-spin" />
+                    생성 중 · 진행 보기
+                </>
+            ) : hasReport ? (
+                <>
+                    보고서 보기
+                    <ArrowRight size={16} />
+                </>
+            ) : (
+                <>
+                    <Sparkles size={16} />
+                    보고서 생성
+                    <ArrowRight size={16} />
+                </>
+            )}
+        </button>
+    );
 
     // 🛡️ Refresh Guard: Redirect to upload if data is lost
     useEffect(() => {
@@ -163,11 +202,30 @@ export default function VisualBuilder() {
                 {activeUnit ? (
                     <div className="flex-1 p-4 sm:p-6 lg:p-10 pb-10 lg:pb-24">
                         <div className="max-w-6xl mx-auto flex flex-col gap-6 lg:gap-10">
-                            {/* Heading for Active Unit */}
-                            <div className="flex items-center justify-between">
+                            {/* Heading for Active Unit + step actions */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div>
                                     <h2 className="text-2xl font-black text-slate-800 tracking-tight">{activeUnit.name}</h2>
                                     <p className="text-slate-500 text-sm font-medium">단위 데이터: {activeUnit.data.length}개 포인트 | 컬럼: {activeUnit.columns.length}개</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => navigate('/upload')}
+                                        className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-bold text-slate-500 hover:text-slate-900 hover:bg-white border border-transparent hover:border-slate-200 transition-all whitespace-nowrap"
+                                    >
+                                        <ArrowLeft size={16} />
+                                        이전
+                                    </button>
+                                    {hasReport && !isGeneratingReport && (
+                                        <button
+                                            onClick={() => setIsTemplateModalOpen(true)}
+                                            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-bold text-violet-600 bg-white border border-violet-200 hover:bg-violet-50 transition-all whitespace-nowrap"
+                                        >
+                                            <RefreshCw size={16} />
+                                            다시 생성
+                                        </button>
+                                    )}
+                                    {reportButton("flex-1 sm:flex-none")}
                                 </div>
                             </div>
 
@@ -188,8 +246,17 @@ export default function VisualBuilder() {
                                         />
                                     </section>
 
-                                    <section className="w-full pb-4 lg:pb-20">
+                                    <section className="w-full">
                                         <AnalysisPanel />
+                                    </section>
+
+                                    {/* Next step: report generation, right after the analysis results */}
+                                    <section className="w-full mb-4 lg:mb-20 rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50/50 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                        <div>
+                                            <h3 className="font-black text-slate-800">다음 단계: 보고서 생성</h3>
+                                            <p className="text-sm text-slate-500 mt-1 break-keep">그래프와 분석 결과를 바탕으로 AI가 실험 보고서 초안을 작성합니다. 보통 20~40초 걸립니다.</p>
+                                        </div>
+                                        {reportButton("w-full sm:w-auto shrink-0")}
                                     </section>
                                 </>
                             )}
@@ -204,6 +271,11 @@ export default function VisualBuilder() {
                     </div>
                 )}
             </main>
+
+            <TemplateSelectorModal
+                isOpen={isTemplateModalOpen}
+                onOpenChange={setIsTemplateModalOpen}
+            />
         </div>
     );
 }
