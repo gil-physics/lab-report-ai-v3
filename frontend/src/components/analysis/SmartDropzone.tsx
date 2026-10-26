@@ -873,6 +873,8 @@ const SmartDropzone: React.FC = () => {
                     </motion.div>
                 </div>
             </div>
+
+            <p className="mt-10 text-sm font-semibold tracking-wide text-slate-500">Made by Gil</p>
         </div>
     );
 
